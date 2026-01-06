@@ -1,0 +1,2150 @@
+{% extends "base.html" %}
+
+{% block title %}{{ website.name }} - PenTest Notes{% endblock %}
+
+{% block content %}
+<!-- Хлебные крошки -->
+<div class="col-12 mb-3">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i> Проекты</a></li>
+            {% if project %}
+            <li class="breadcrumb-item"><a href="{{ url_for('project_detail', project_id=project.id) }}">{{ project.name }}</a></li>
+            {% else %}
+            <li class="breadcrumb-item"><a href="/websites">Все сайты</a></li>
+            {% endif %}
+            <li class="breadcrumb-item active" aria-current="page">{{ website.name }}</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="col-md-3 sidebar">
+    <div class="p-3">
+        <h5><i class="fas fa-globe"></i> {{ website.name }}</h5>
+        <p class="text-muted small">{{ website.url }}</p>
+        {% set st = website.status or 'Не начат' %}
+        <span id="websiteStatusBadge" class="badge {% if st == 'В работе' %}bg-warning text-dark{% elif st == 'Закрыт' %}bg-success{% elif st == 'Вернуться позже' %}bg-info text-dark{% else %}bg-secondary{% endif %} mb-3" style="cursor:pointer" title="Изменить статус" onclick="openStatusPicker(event, {{ website.id }})">
+            {{ st }}
+        </span>
+        
+        <!-- Навигация по сайтам проекта -->
+        {% if project and project_websites|length > 1 %}
+        <div class="card mb-3">
+            <div class="card-header">
+                 <h6 class="mb-0">
+                     <i class="fas fa-sitemap"></i> Сайты проекта 
+                     <span class="badge bg-secondary ms-2">{{ project_websites|length }}</span>
+                 </h6>
+             </div>
+            <div class="card-body p-2">
+                <div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
+                     {% for site in project_websites %}
+                     <a href="{{ url_for('website_detail', website_id=site.id) }}" 
+                        class="list-group-item list-group-item-action py-2 px-3 {% if site.id == website.id %}border-primary border-2 bg-light{% endif %}" 
+                        style="{% if site.id == website.id %}border-left: 4px solid #0d6efd !important;{% endif %}">
+                         <div class="d-flex justify-content-between align-items-center">
+                             <div>
+                                 <i class="fas fa-globe me-2 {% if site.id == website.id %}text-primary{% endif %}"></i>
+                                 <span class="fw-bold {% if site.id == website.id %}text-primary{% endif %}">{{ site.name }}</span>
+                                 <br>
+                                 <small class="text-muted">{{ site.url }}</small>
+                             </div>
+                             <span class="badge bg-{% if site.status == 'В работе' %}warning{% else %}secondary{% endif %} ms-2">
+                                 {{ site.status }}
+                             </span>
+                         </div>
+                     </a>
+                     {% endfor %}
+                 </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="d-grid gap-2 mb-3">
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addFunctionModal">
+                <i class="fas fa-plus"></i> Добавить функцию
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="showBasicInfo()">
+                <i class="fas fa-info-circle"></i> Базовая информация
+            </button>
+        </div>
+        
+        <h6>Функции сайта:</h6>
+        <div id="functionsTree">
+            <!-- Дерево функций будет загружено через JavaScript -->
+        </div>
+    </div>
+</div>
+
+<div class="col-md-9 main-content">
+    <div class="p-3">
+        <!-- Базовая информация -->
+        <div id="basicInfoSection">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4><i class="fas fa-info-circle"></i> Базовая информация</h4>
+                <div>
+                    <a href="{{ url_for('csv_analyzer', website_id=website.id) }}" class="btn btn-outline-success btn-sm me-2">
+                        <i class="fas fa-chart-bar"></i> Анализ и импорт CSV
+                    </a>
+                    <button class="btn btn-outline-primary btn-sm" onclick="editBasicInfo()">
+                        <i class="fas fa-edit"></i> Редактировать
+                    </button>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    {% if website.screenshot %}
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-image"></i> Скриншот сайта</h6>
+                        </div>
+                        <div class="card-body text-center">
+                            <img src="{{ url_for('uploaded_file', filename=website.screenshot.split('/')[-1]) }}" 
+                                 class="img-fluid rounded" 
+                                 alt="Скриншот {{ website.name }}"
+                                 style="max-height: 300px; cursor: pointer;"
+                                 onclick="window.open(this.src, '_blank')">
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="fas fa-code"></i> Технологии</h6>
+                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addTechnologyModal">
+                                <i class="fas fa-plus"></i> Добавить
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="technologiesDisplay">
+                                {% if technologies %}
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Технология</th>
+                                                    <th>Версия</th>
+                                                    <th width="80">Действия</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for tech in technologies %}
+                                                <tr>
+                                                    <td><code>{{ tech.name }}</code></td>
+                                                    <td>{{ tech.version or '-' }}</td>
+                                                    <td>
+                                                        <button class="btn btn-outline-danger btn-sm" onclick="deleteTechnology({{ tech.id }})" title="Удалить">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    Не указано
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    
+
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="fas fa-server"></i> Порты IP</h6>
+                            <button class="btn btn-sm btn-outline-primary" onclick="loadIpPortsForDomain()" title="Обновить">
+                                <i class="fas fa-sync"></i>
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="ipPortsDisplay" class="text-muted">Нажмите «Обновить», чтобы показать открытые порты по IP</div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="fas fa-certificate"></i> Сертификаты</h6>
+                            <button class="btn btn-sm btn-primary" onclick="document.getElementById('certificateFileInput').click()">
+                                <i class="fas fa-upload"></i> Загрузить файл
+                            </button>
+                            <input type="file" id="certificateFileInput" accept=".json" style="display: none;" onchange="parseCertificateFile(this)">
+                        </div>
+                        <div class="card-body">
+                            <div id="certificatesDisplay">
+                                {% if website.certificates %}
+                                    <div class="table-responsive">
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>IP:Port</th>
+                                                    <th>Организация</th>
+                                                    <th>Common Name</th>
+                                                    <th>SAN</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="certificatesTableBody">
+                                                <!-- Данные будут загружены через JavaScript -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    Не указано
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-file"></i> Файлы</h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="filesDisplay">
+                                {% if website.files %}
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Файл</th>
+                                                    <th>Статус</th>
+                                                    <th width="100">Действия</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="filesTableBody">
+                                                {% for line in website.files.split('\n') if line.strip() %}
+                                                <tr>
+                                                    {% set parts = line.split(' (HTTP ') %}
+                                                    <td><code>{{ parts[0] }}</code></td>
+                                                    <td>
+                                                        {% if parts|length > 1 %}
+                                                            {% set status = parts[1].rstrip(')') %}
+                                                            <span class="badge bg-{% if status.startswith('2') %}success{% elif status.startswith('3') %}warning{% elif status.startswith('4') %}danger{% else %}secondary{% endif %}">
+                                                                {{ status }}
+                                                            </span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        <button class="btn btn-outline-warning btn-sm me-1" onclick="transferSingleEntry('files', '{{ parts[0] }}')" title="Перенести">
+                                                            <i class="fas fa-exchange-alt"></i>
+                                                        </button>
+                                                        <button class="btn btn-outline-danger btn-sm" onclick="deleteEntry('files', '{{ parts[0] }}')" title="Удалить">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    Не указано
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-route"></i> Маршруты</h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="routesDisplay">
+                                {% if website.routes %}
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Маршрут</th>
+                                                    <th>Статус</th>
+                                                    <th width="100">Действия</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="routesTableBody">
+                                                {% for line in website.routes.split('\n') if line.strip() %}
+                                                <tr>
+                                                    {% set parts = line.split(' (HTTP ') %}
+                                                    <td><code>{{ parts[0] }}</code></td>
+                                                    <td>
+                                                        {% if parts|length > 1 %}
+                                                            {% set status = parts[1].rstrip(')') %}
+                                                            <span class="badge bg-{% if status.startswith('2') %}success{% elif status.startswith('3') %}warning{% elif status.startswith('4') %}danger{% else %}secondary{% endif %}">
+                                                                {{ status }}
+                                                            </span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        <button class="btn btn-outline-warning btn-sm me-1" onclick="transferSingleEntry('routes', '{{ parts[0] }}')" title="Перенести">
+                                                            <i class="fas fa-exchange-alt"></i>
+                                                        </button>
+                                                        <button class="btn btn-outline-danger btn-sm" onclick="deleteEntry('routes', '{{ parts[0] }}')" title="Удалить">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    Не указано
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-folder"></i> Каталоги</h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="directoriesDisplay">
+                                {% if website.directories %}
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Каталог</th>
+                                                    <th>Статус</th>
+                                                    <th width="100">Действия</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="directoriesTableBody">
+                                                {% for line in website.directories.split('\n') if line.strip() %}
+                                                <tr>
+                                                    {% set parts = line.split(' (HTTP ') %}
+                                                    <td><code>{{ parts[0] }}</code></td>
+                                                    <td>
+                                                        {% if parts|length > 1 %}
+                                                            {% set status = parts[1].rstrip(')') %}
+                                                            <span class="badge bg-{% if status.startswith('2') %}success{% elif status.startswith('3') %}warning{% elif status.startswith('4') %}danger{% else %}secondary{% endif %}">
+                                                                {{ status }}
+                                                            </span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        <button class="btn btn-outline-warning btn-sm me-1" onclick="transferSingleEntry('directories', '{{ parts[0] }}')" title="Перенести">
+                                                            <i class="fas fa-exchange-alt"></i>
+                                                        </button>
+                                                        <button class="btn btn-outline-danger btn-sm" onclick="deleteEntry('directories', '{{ parts[0] }}')" title="Удалить">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    Не указано
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Детали функции -->
+        <div id="functionDetailSection" style="display: none;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 id="functionTitle"><i class="fas fa-cog"></i> Функция</h4>
+                <div>
+                    <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addEndpointModal">
+                        <i class="fas fa-plus"></i> Добавить Endpoint
+                    </button>
+                    <button class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#addRawRequestModal">
+                        <i class="fas fa-code"></i> Добавить raw запрос
+                    </button>
+                    <button class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#addNoteModal">
+                        <i class="fas fa-sticky-note"></i> Добавить заметку
+                    </button>
+                </div>
+            </div>
+            
+            <div id="functionDescription" class="mb-3"></div>
+            
+            <!-- Endpoints -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-link"></i> Endpoints</h6>
+                </div>
+                <div class="card-body">
+                    <div id="endpointsList">
+                        <!-- Endpoints будут загружены через JavaScript -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Заметки -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="fas fa-sticky-note"></i> Заметки</h6>
+                </div>
+                <div class="card-body">
+                    <div id="notesList">
+                        <!-- Заметки будут загружены через JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Приветственное сообщение -->
+        <div id="welcomeSection">
+            <div class="text-center py-5">
+                <i class="fas fa-mouse-pointer fa-3x text-muted mb-3"></i>
+                <h4 class="text-muted">Выберите функцию или базовую информацию</h4>
+                <p class="text-muted">Используйте боковую панель для навигации</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для редактирования базовой информации -->
+<div class="modal fade" id="editBasicInfoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Редактировать базовую информацию</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editBasicInfoForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editTechnologies" class="form-label">Технологии</label>
+                                <textarea class="form-control" id="editTechnologies" rows="3">{{ website.technologies or '' }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="editPorts" class="form-label">Порты</label>
+                                <textarea class="form-control" id="editPorts" rows="3" readonly>{{ website.ports or '' }}</textarea>
+                                <small class="form-text text-muted">Порты синхронизируются по IP из графа Attack Surface</small>
+                            </div>
+                            <div class="mb-3">
+                                <label for="editCertificates" class="form-label">Сертификаты</label>
+                                <div class="input-group">
+                                    <textarea class="form-control" id="editCertificates" name="certificates" rows="3">{{ website.certificates or '' }}</textarea>
+                                    <button class="btn btn-outline-primary" type="button" onclick="document.getElementById('editCertificateFileInput').click()">
+                                        <i class="fas fa-upload"></i> Загрузить
+                                    </button>
+                                </div>
+                                <input type="file" id="editCertificateFileInput" accept=".json" style="display: none;" onchange="parseEditCertificateFile(this)">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editFiles" class="form-label">Файлы</label>
+                                <textarea class="form-control" id="editFiles" rows="3">{{ website.files or '' }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="editRoutes" class="form-label">Маршруты</label>
+                                <textarea class="form-control" id="editRoutes" rows="3">{{ website.routes or '' }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="editDirectories" class="form-label">Каталоги</label>
+                                <textarea class="form-control" id="editDirectories" rows="3">{{ website.directories or '' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveBasicInfo()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для добавления технологии -->
+<div class="modal fade" id="addTechnologyModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить технологию</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addTechnologyForm">
+                    <div class="mb-3">
+                        <label for="technologyName" class="form-label">Название технологии</label>
+                        <input type="text" class="form-control" id="technologyName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="technologyVersion" class="form-label">Версия (необязательно)</label>
+                        <input type="text" class="form-control" id="technologyVersion">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveTechnology()">Добавить</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Экспорт клика для глобального доступа из HTML
+// Инициализируется ниже после определения функции
+const websiteId = {{ website.id }};
+let currentFunctionId = null;
+let functions = [];
+
+// Функция для экранирования HTML символов
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Определяем функции сразу, чтобы они были доступны для onclick
+function deletePort(portId, websiteId) {
+    if (!confirm('Вы уверены, что хотите удалить этот порт?')) {
+        return;
+    }
+    
+    fetch(`/api/ports/${portId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            // Находим и удаляем строку порта из таблицы
+            const portRow = document.querySelector(`button[onclick="deletePort(${portId}, ${websiteId})"]`).closest('tr');
+            if (portRow) {
+                portRow.remove();
+                
+                // Проверяем, остались ли еще порты в таблице
+                const portsTable = document.querySelector('#portsDisplay table tbody');
+                if (portsTable && portsTable.children.length === 0) {
+                    // Если портов больше нет, показываем сообщение
+                    document.getElementById('portsDisplay').innerHTML = 'Не указано';
+                }
+                
+                alert(data.message);
+            } else {
+                alert(data.message);
+                console.warn('Строка порта не найдена в DOM');
+            }
+        } else {
+            alert('Ошибка при удалении порта');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Ошибка при удалении порта');
+    });
+}
+
+function deleteTechnology(techId, websiteId) {
+    if (!confirm('Вы уверены, что хотите удалить эту технологию?')) {
+        return;
+    }
+    
+    fetch(`/api/technologies/${techId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            // Находим и удаляем строку технологии из таблицы
+            const techRow = document.querySelector(`button[onclick="deleteTechnology(${techId})"]`).closest('tr');
+            if (techRow) {
+                techRow.remove();
+                
+                // Проверяем, остались ли еще технологии в таблице
+                const techTable = document.querySelector('#technologiesDisplay table tbody');
+                if (techTable && techTable.children.length === 0) {
+                    // Если технологий больше нет, показываем сообщение
+                    document.getElementById('technologiesDisplay').innerHTML = 'Не указано';
+                }
+                
+                alert(data.message);
+            } else {
+                alert(data.message);
+                console.warn('Строка технологии не найдена в DOM');
+            }
+        } else {
+            alert('Ошибка при удалении технологии');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Ошибка при удалении технологии');
+    });
+}
+
+// Функция для обработки загруженного nmap файла
+function handleNmapFile(event) { alert('Загрузка портов для домена отключена. Используйте загрузку портов для IP через граф Attack Surface.'); }
+
+// Функция для отправки портов на сервер
+function uploadNmapPorts(portsData) { alert('Загрузка портов для домена отключена. Используйте загрузку портов для IP через граф Attack Surface.'); }
+
+window.deleteEntry = function deleteEntry(entryType, entryName) {
+    if (!confirm(`Вы уверены, что хотите удалить запись "${entryName}" из ${entryType === 'files' ? 'файлов' : entryType === 'routes' ? 'маршрутов' : 'каталогов'}?`)) {
+        return;
+    }
+    
+    fetch(`/api/websites/${websiteId}/delete-entry`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            entry_type: entryType,
+            entry_name: entryName
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            // Находим и удаляем строку из соответствующей таблицы
+            const entryRow = document.querySelector(`button[onclick="deleteEntry('${entryType}', '${entryName}')"]`).closest('tr');
+            if (entryRow) {
+                entryRow.remove();
+                
+                // Проверяем, остались ли еще записи в таблице
+                let tableContainer, emptyMessage;
+                if (entryType === 'files') {
+                    tableContainer = document.querySelector('#filesDisplay table tbody');
+                    emptyMessage = 'Файлы не найдены';
+                } else if (entryType === 'routes') {
+                    tableContainer = document.querySelector('#routesDisplay table tbody');
+                    emptyMessage = 'Маршруты не найдены';
+                } else if (entryType === 'directories') {
+                    tableContainer = document.querySelector('#directoriesDisplay table tbody');
+                    emptyMessage = 'Каталоги не найдены';
+                }
+                
+                if (tableContainer && tableContainer.children.length === 0) {
+                    // Если записей больше нет, показываем сообщение
+                    const displayElement = document.getElementById(entryType === 'files' ? 'filesDisplay' : entryType === 'routes' ? 'routesDisplay' : 'directoriesDisplay');
+                    displayElement.innerHTML = emptyMessage;
+                }
+                
+                alert('Запись успешно удалена!');
+            } else {
+                alert('Запись успешно удалена!');
+                console.warn('Строка записи не найдена в DOM');
+            }
+        } else {
+            alert('Ошибка при удалении записи: ' + (data.error || 'Неизвестная ошибка'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Ошибка при удалении записи');
+    });
+}
+
+function transferSingleEntry(entryType, entryName) {
+    // Получаем список функций
+    fetch(`/api/websites/${websiteId}/functions`)
+    .then(response => response.json())
+    .then(functions => {
+        if (functions.length === 0) {
+            alert('Нет доступных функций для переноса');
+            return;
+        }
+        
+        // Создаем список опций для выбора
+        let options = functions.map(func => `${func.id}: ${func.name}`).join('\n');
+        let targetFunctionId = prompt(`Выберите целевую функцию для переноса записи "${entryName}":\n\n${options}\n\nВведите ID функции:`);
+        
+        if (!targetFunctionId) {
+            return;
+        }
+        
+        targetFunctionId = parseInt(targetFunctionId);
+        let targetFunction = functions.find(f => f.id === targetFunctionId);
+        
+        if (!targetFunction) {
+            alert('Неверный ID функции');
+            return;
+        }
+        
+        if (!confirm(`Перенести запись "${entryName}" в функцию "${targetFunction.name}"?`)) {
+            return;
+        }
+        
+        // Выполняем перенос
+        fetch(`/api/websites/${websiteId}/transfer-single-entry`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                entry_type: entryType,
+                entry_name: entryName,
+                target_function_id: targetFunctionId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.message) {
+                alert(data.message);
+                // Динамически удаляем строку из таблицы
+                let tableBody;
+                if (entryType === 'files') {
+                    tableBody = document.querySelector('#filesTableBody');
+                } else if (entryType === 'routes') {
+                    tableBody = document.querySelector('#routesTableBody');
+                } else if (entryType === 'directories') {
+                    tableBody = document.querySelector('#directoriesTableBody');
+                }
+                
+                if (tableBody) {
+                    const rows = tableBody.querySelectorAll('tr');
+                    for (let row of rows) {
+                        const firstCell = row.querySelector('td:first-child code');
+                        if (firstCell && firstCell.textContent.trim() === entryName) {
+                            row.remove();
+                            break;
+                        }
+                    }
+                }
+                
+                // Проверяем, остались ли элементы в таблице
+                if (tableBody && tableBody.children.length === 0) {
+                    let emptyMessage;
+                    if (entryType === 'files') {
+                        emptyMessage = 'Файлы не найдены';
+                    } else if (entryType === 'routes') {
+                        emptyMessage = 'Маршруты не найдены';
+                    } else if (entryType === 'directories') {
+                        emptyMessage = 'Каталоги не найдены';
+                    }
+                    
+                    // Заменяем содержимое родительского контейнера
+                    const displayDiv = tableBody.closest('.table-responsive').parentElement;
+                    displayDiv.innerHTML = 'Не указано';
+                }
+            } else {
+                alert('Ошибка при переносе записи: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Ошибка при переносе записи');
+        });
+    })
+    .catch(error => {
+        console.error('Error loading functions:', error);
+        alert('Ошибка при загрузке функций');
+    });
+}
+
+// Загрузка функций при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    loadFunctions();
+    
+    // Проверяем хэш URL для автоматического показа базовой информации
+    if (window.location.hash === '#basicInfo') {
+        showBasicInfo();
+    }
+});
+
+function loadFunctions() {
+    fetch(`/api/websites/${websiteId}/functions`)
+    .then(response => response.json())
+    .then(data => {
+        functions = data;
+        renderFunctionsTree();
+        updateParentFunctionSelect();
+        updateTargetFunctionSelect();
+    })
+    .catch(error => {
+        console.error('Error loading functions:', error);
+    });
+}
+
+function renderFunctionsTree() {
+    const container = document.getElementById('functionsTree');
+    const rootFunctions = functions.filter(f => !f.parent_id);
+    
+    if (rootFunctions.length === 0) {
+        container.innerHTML = '<p class="text-muted small">Нет функций</p>';
+        return;
+    }
+    
+    container.innerHTML = '';
+    rootFunctions.forEach(func => {
+        renderFunctionItem(func, container, 0);
+    });
+}
+
+function getStatusColor(status) {
+    switch(status) {
+        case 'active': return 'success';
+        case 'inactive': return 'secondary';
+        case 'testing': return 'warning';
+        case 'completed': return 'info';
+        default: return 'success';
+    }
+}
+
+function editBasicInfo() {
+    new bootstrap.Modal(document.getElementById('editBasicInfoModal')).show();
+}
+
+function saveBasicInfo() {
+    const technologies = document.getElementById('editTechnologies').value;
+    const ports = document.getElementById('editPorts').value;
+    const certificates = document.getElementById('editCertificates').value;
+    const files = document.getElementById('editFiles').value;
+    const routes = document.getElementById('editRoutes').value;
+    const directories = document.getElementById('editDirectories').value;
+    
+    fetch(`/api/websites/${websiteId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            technologies: technologies,
+            ports: ports,
+            certificates: certificates,
+            files: files,
+            routes: routes,
+            directories: directories
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        bootstrap.Modal.getInstance(document.getElementById('editBasicInfoModal')).hide();
+        try {
+            const ev = new CustomEvent('websiteUpdated', { detail: { id: websiteId, status: data.status, url: data.url, name: data.name } });
+            window.dispatchEvent(ev);
+        } catch (e) {}
+        try {
+            if (typeof updateAttackSurfaceDisplay === 'function') updateAttackSurfaceDisplay();
+        } catch (e) {}
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Ошибка при сохранении данных');
+    });
+}
+
+function editFunction(functionId, event) {
+    event.stopPropagation();
+    
+    const func = functions.find(f => f.id === functionId);
+    if (!func) return;
+    
+    // Заполняем форму редактирования
+    document.getElementById('editFunctionName').value = func.name;
+    document.getElementById('editFunctionDescription').value = func.description || '';
+    document.getElementById('editFunctionStatus').value = func.status || 'active';
+    
+    editingFunctionId = functionId;
+    
+    // Показываем модальное окно
+    const modal = new bootstrap.Modal(document.getElementById('editFunctionModal'));
+    modal.show();
+}
+
+function deleteFunction(functionId, event) {
+    event.stopPropagation();
+    
+    const func = functions.find(f => f.id === functionId);
+    const hasChildren = functions.some(f => f.parent_id === functionId);
+    
+    if (hasChildren) {
+        alert('Нельзя удалить функцию, у которой есть дочерние функции. Сначала удалите или переместите дочерние функции.');
+        return;
+    }
+    
+    if (!confirm(`Вы уверены, что хотите удалить функцию "${func.name}"? Это действие нельзя отменить.`)) {
+        return;
+    }
+    
+    fetch(`/api/functions/${functionId}`, {
+        method: 'DELETE'
+    })
+    .then(response => {
+        if (response.ok) {
+            // Если удаляемая функция была выбрана, скрываем детали
+            if (currentFunctionId === functionId) {
+                document.getElementById('functionDetailSection').style.display = 'none';
+                document.getElementById('welcomeSection').style.display = 'block';
+                currentFunctionId = null;
+            }
+            loadFunctions();
+        } else {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Ошибка при удалении функции');
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert(error.message || 'Ошибка при удалении функции');
+    });
+}
+
+function renderFunctionItem(func, container, level) {
+    const div = document.createElement('div');
+    div.className = 'function-item d-flex justify-content-between align-items-center';
+    div.style.marginLeft = (level * 15) + 'px';
+    
+    const childrenCount = functions.filter(f => f.parent_id === func.id).length;
+    const isParent = childrenCount > 0;
+    
+    // Для корневых функций используем одинаковую иконку
+    let icon;
+    if (func.parent_id === null) {
+        icon = 'fas fa-sitemap'; // Одинаковая иконка для всех корневых функций
+    } else {
+        icon = childrenCount > 0 ? 'fas fa-folder' : 'fas fa-cog';
+    }
+    
+    // Добавляем специальный класс и стиль для родительских функций
+    const parentClass = isParent ? 'parent-function' : '';
+    const parentStyle = isParent ? 'background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-left: 4px solid #007bff; font-weight: 600;' : '';
+    
+    div.innerHTML = `
+        <div class="function-info ${parentClass}" onclick="selectFunction(${func.id})" style="flex: 1; cursor: pointer; ${parentStyle}">
+            <i class="${icon}" style="${isParent ? 'color: #007bff;' : ''}"></i> ${escapeHtml(func.name)}
+            ${isParent ? '<span class="text-primary" style="font-size: 0.8em; margin-left: 5px;">(Родитель)</span>' : ''}
+            <small class="text-muted">
+                (E: ${func.endpoints_count}, N: ${func.notes_count})
+            </small>
+            <span class="badge bg-${getStatusColor(func.status)} ml-2">${func.status || 'active'}</span>
+        </div>
+        <div class="function-actions">
+            <button class="btn btn-sm btn-outline-primary mr-1" onclick="editFunction(${func.id}, event)" title="Редактировать функцию">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteFunction(${func.id}, event)" title="Удалить функцию">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `;
+    
+    container.appendChild(div);
+    
+    // Рендерим дочерние функции
+    const children = functions.filter(f => f.parent_id === func.id);
+    children.forEach(child => {
+        renderFunctionItem(child, container, level + 1);
+    });
+}
+
+function selectFunction(functionId) {
+    currentFunctionId = functionId;
+    const func = functions.find(f => f.id === functionId);
+    
+    // Обновляем активный элемент
+    document.querySelectorAll('.function-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Показываем детали функции
+    showFunctionDetail(func);
+    loadEndpoints(functionId);
+    loadNotes(functionId);
+}
+
+function showFunctionDetail(func) {
+    document.getElementById('welcomeSection').style.display = 'none';
+    document.getElementById('basicInfoSection').style.display = 'none';
+    document.getElementById('functionDetailSection').style.display = 'block';
+    
+    // Используем ту же логику для выбора иконки
+    const childrenCount = functions.filter(f => f.parent_id === func.id).length;
+    let icon;
+    if (func.parent_id === null) {
+        icon = 'fas fa-sitemap'; // Одинаковая иконка для всех корневых функций
+    } else {
+        icon = childrenCount > 0 ? 'fas fa-folder' : 'fas fa-cog';
+    }
+    
+    document.getElementById('functionTitle').innerHTML = `<i class="${icon}"></i> ${escapeHtml(func.name)}`;
+    document.getElementById('functionDescription').innerHTML = func.description ? escapeHtml(func.description) : '<em class="text-muted">Описание не указано</em>';
+}
+
+function showBasicInfo() {
+    document.getElementById('welcomeSection').style.display = 'none';
+    document.getElementById('functionDetailSection').style.display = 'none';
+    document.getElementById('basicInfoSection').style.display = 'block';
+    
+    // Убираем активный класс с функций
+    document.querySelectorAll('.function-item').forEach(item => {
+        item.classList.remove('active');
+    });
+}
+
+function loadEndpoints(functionId) {
+    if (!functionId) {
+        console.error('Function ID is null or undefined');
+        return;
+    }
+    fetch(`/api/functions/${functionId}/endpoints`)
+    .then(response => response.json())
+    .then(data => {
+        renderEndpoints(data);
+    })
+    .catch(error => {
+        console.error('Error loading endpoints:', error);
+    });
+}
+
+function renderEndpoints(endpoints) {
+    const container = document.getElementById('endpointsList');
+    
+    if (endpoints.length === 0) {
+        container.innerHTML = '<p class="text-muted">Нет endpoints</p>';
+        return;
+    }
+    
+    container.innerHTML = endpoints.map(endpoint => `
+        <div class="border rounded p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <span class="endpoint-method method-${endpoint.method.toLowerCase()}">${endpoint.method}</span>
+                    <code class="ms-2">${endpoint.url}</code>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-secondary">${endpoint.status}</span>
+                    <button class="btn btn-sm btn-outline-primary" onclick="editEndpoint(${endpoint.id})" title="Редактировать">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteEndpoint(${endpoint.id})" title="Удалить">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            ${endpoint.parameters ? `<div class="mb-2"><strong>Параметры:</strong><br><pre class="small">${escapeHtml(endpoint.parameters)}</pre></div>` : ''}
+            ${endpoint.headers ? `<div class="mb-2"><strong>Заголовки:</strong><br><pre class="small">${escapeHtml(endpoint.headers)}</pre></div>` : ''}
+            ${endpoint.response_info ? `<div><strong>Ответ:</strong><br><pre class="small">${escapeHtml(endpoint.response_info)}</pre></div>` : ''}
+        </div>
+    `).join('');
+}
+
+function loadNotes(functionId) {
+    fetch(`/api/functions/${functionId}/notes`)
+    .then(response => response.json())
+    .then(data => {
+        renderNotes(data);
+    })
+    .catch(error => {
+        console.error('Error loading notes:', error);
+    });
+}
+
+function renderNotes(notes) {
+    const container = document.getElementById('notesList');
+    
+    if (notes.length === 0) {
+        container.innerHTML = '<p class="text-muted">Нет заметок</p>';
+        return;
+    }
+    
+    container.innerHTML = notes.map(note => `
+        <div class="card note-card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-start">
+                <div>
+                    <h6 class="mb-0">${escapeHtml(note.title)}</h6>
+                    <small class="text-muted">${new Date(note.created_at).toLocaleString('ru-RU')}</small>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-primary" onclick="editNote(${note.id})" title="Редактировать">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteNote(${note.id})" title="Удалить">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <pre class="mb-0">${escapeHtml(note.content)}</pre>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateParentFunctionSelect() {
+    const select = document.getElementById('parentFunction');
+    select.innerHTML = '<option value="">Нет (корневая функция)</option>';
+    
+    functions.forEach(func => {
+        const option = document.createElement('option');
+        option.value = func.id;
+        option.textContent = func.name;
+        select.appendChild(option);
+    });
+}
+
+function updateTargetFunctionSelect() {
+    const select = document.getElementById('targetFunction');
+    if (!select) return;
+    
+    select.innerHTML = '<option value="">Выберите функцию...</option>';
+    
+    functions.forEach(func => {
+        const option = document.createElement('option');
+        option.value = func.id;
+        option.textContent = func.name;
+        select.appendChild(option);
+    });
+
+// Функция addFunction теперь определена глобально в app.js
+
+
+
+
+
+
+
+
+
+
+
+// Функции addEndpoint и addNote теперь определены в app.js
+
+// Функции для обновления табличного отображения
+function updateFilesTable(filesText) {
+    const tbody = document.getElementById('filesTableBody');
+    if (!tbody) return;
+    
+    if (!filesText || filesText.trim() === '') {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-muted">Нет данных</td></tr>';
+        return;
+    }
+    
+    const lines = filesText.split('\n').filter(line => line.trim());
+    tbody.innerHTML = lines.map(line => {
+        const parts = line.split(' (HTTP ');
+        const fileName = parts[0];
+        const status = parts.length > 1 ? parts[1].replace(')', '') : '';
+        const badgeClass = getStatusBadgeClass(status);
+        
+        return `
+            <tr>
+                <td><code>${fileName}</code></td>
+                <td>
+                    ${status ? `<span class="badge bg-${badgeClass}">${status}</span>` : ''}
+                </td>
+                <td>
+                    <button class="btn btn-outline-warning btn-sm me-1" onclick="transferSingleEntry('files', '${fileName}')" title="Перенести">
+                        <i class="fas fa-exchange-alt"></i>
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="deleteEntry('files', '${fileName}')" title="Удалить">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function updateRoutesTable(routesText) {
+    const tbody = document.getElementById('routesTableBody');
+    if (!tbody) return;
+    
+    if (!routesText || routesText.trim() === '') {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-muted">Нет данных</td></tr>';
+        return;
+    }
+    
+    const lines = routesText.split('\n').filter(line => line.trim());
+    tbody.innerHTML = lines.map(line => {
+        const parts = line.split(' (HTTP ');
+        const routeName = parts[0];
+        const status = parts.length > 1 ? parts[1].replace(')', '') : '';
+        const badgeClass = getStatusBadgeClass(status);
+        
+        return `
+            <tr>
+                <td><code>${routeName}</code></td>
+                <td>
+                    ${status ? `<span class="badge bg-${badgeClass}">${status}</span>` : ''}
+                </td>
+                <td>
+                    <button class="btn btn-outline-warning btn-sm me-1" onclick="transferSingleEntry('routes', '${routeName}')" title="Перенести">
+                        <i class="fas fa-exchange-alt"></i>
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="deleteEntry('routes', '${routeName}')" title="Удалить">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function updateDirectoriesTable(directoriesText) {
+    const tbody = document.getElementById('directoriesTableBody');
+    if (!tbody) return;
+    
+    if (!directoriesText || directoriesText.trim() === '') {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-muted">Нет данных</td></tr>';
+        return;
+    }
+    
+    const lines = directoriesText.split('\n').filter(line => line.trim());
+    tbody.innerHTML = lines.map(line => {
+        const parts = line.split(' (HTTP ');
+        const dirName = parts[0];
+        const status = parts.length > 1 ? parts[1].replace(')', '') : '';
+        const badgeClass = getStatusBadgeClass(status);
+        
+        return `
+            <tr>
+                <td><code>${dirName}</code></td>
+                <td>
+                    ${status ? `<span class="badge bg-${badgeClass}">${status}</span>` : ''}
+                </td>
+                <td>
+                    <button class="btn btn-outline-warning btn-sm me-1" onclick="transferSingleEntry('directories', '${dirName}')" title="Перенести">
+                        <i class="fas fa-exchange-alt"></i>
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="deleteEntry('directories', '${dirName}')" title="Удалить">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+
+
+function getStatusBadgeClass(status) {
+    if (!status) return 'secondary';
+    
+    // Для HTTP статусов
+    if (status.startsWith('2')) return 'success';
+    if (status.startsWith('3')) return 'warning';
+    if (status.startsWith('4')) return 'danger';
+    
+    // Для статусов функций
+    switch(status) {
+        case 'active': return 'success';
+        case 'inactive': return 'secondary';
+        case 'testing': return 'warning';
+        case 'completed': return 'info';
+        default: return 'secondary';
+    }
+}
+
+// Функция для обновления всех таблиц после импорта
+function refreshBasicInfoTables() {
+    fetch(`/api/websites/${websiteId}`)
+    .then(response => response.json())
+    .then(data => {
+        updateFilesTable(data.files);
+        updateRoutesTable(data.routes);
+        updateDirectoriesTable(data.directories);
+    })
+    .catch(error => {
+        console.error('Error refreshing tables:', error);
+    });
+}
+
+// Сброс форм при закрытии модальных окон
+document.getElementById('addFunctionModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('addFunctionForm').reset();
+});
+
+document.getElementById('addEndpointModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('addEndpointForm').reset();
+});
+
+document.getElementById('addNoteModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('addNoteForm').reset();
+});
+
+
+
+
+
+
+
+
+// Обработчик для сброса формы при закрытии модального окна
+document.addEventListener('DOMContentLoaded', function() {
+    const editFunctionModal = document.getElementById('editFunctionModal');
+    if (editFunctionModal) {
+        editFunctionModal.addEventListener('hidden.bs.modal', function () {
+            // Сбрасываем форму при закрытии модального окна
+            document.getElementById('editFunctionName').value = '';
+            document.getElementById('editFunctionDescription').value = '';
+            document.getElementById('editFunctionStatus').value = 'active';
+        });
+    }
+});
+}
+
+// Функции для редактирования и удаления эндпоинтов
+let originalEndpointMethod = null; // Переменная для хранения оригинального метода
+
+function editEndpoint(endpointId) {
+    // Получаем данные эндпоинта
+    fetch(`/api/endpoints/${endpointId}`)
+    .then(response => response.json())
+    .then(endpoint => {
+        // Сохраняем оригинальный метод для сравнения
+        originalEndpointMethod = endpoint.method || 'GET';
+        
+        // Заполняем форму данными эндпоинта
+        document.getElementById('endpointUrl').value = endpoint.url || '';
+        document.getElementById('endpointMethod').value = endpoint.method || 'GET';
+        document.getElementById('endpointParameters').value = endpoint.parameters || '';
+        document.getElementById('endpointHeaders').value = endpoint.headers || '';
+        document.getElementById('endpointResponse').value = endpoint.response_info || '';
+        document.getElementById('endpointStatus').value = endpoint.status || 'Не начат';
+        
+        // Меняем кнопку на "Обновить"
+        const submitBtn = document.querySelector('#addEndpointModal .modal-footer .btn-primary');
+        if (submitBtn) {
+            submitBtn.textContent = 'Обновить Endpoint';
+            submitBtn.onclick = function(e) {
+                e.preventDefault();
+                updateEndpoint(endpointId);
+            };
+        }
+        
+        // Показываем модальное окно
+        const modal = new bootstrap.Modal(document.getElementById('addEndpointModal'));
+        modal.show();
+    })
+    .catch(error => {
+        console.error('Error loading endpoint:', error);
+        alert('Ошибка при загрузке данных эндпоинта');
+    });
+}
+
+function updateEndpoint(endpointId) {
+    const formData = {
+        url: document.getElementById('endpointUrl').value,
+        method: document.getElementById('endpointMethod').value,
+        parameters: document.getElementById('endpointParameters').value,
+        headers: document.getElementById('endpointHeaders').value,
+        response_info: document.getElementById('endpointResponse').value,
+        status: document.getElementById('endpointStatus').value
+    };
+    
+    const currentMethod = formData.method;
+    
+    // Проверяем, изменился ли метод
+    if (originalEndpointMethod && currentMethod !== originalEndpointMethod) {
+        // Метод изменился - создаем новый эндпоинт
+        fetch(`/api/functions/${currentFunctionId}/endpoints`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.message) {
+                alert('Создан новый эндпоинт с измененным методом!');
+                // Закрываем модальное окно
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addEndpointModal'));
+                if (modal) {
+                    modal.hide();
+                }
+                loadEndpoints(currentFunctionId);
+                loadFunctions();
+            }
+        })
+        .catch(error => {
+            console.error('Error creating new endpoint:', error);
+            alert('Ошибка при создании нового эндпоинта');
+        });
+    } else {
+        // Метод не изменился - обновляем существующий эндпоинт
+        fetch(`/api/endpoints/${endpointId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.message) {
+                alert('Endpoint обновлен успешно!');
+                // Закрываем модальное окно
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addEndpointModal'));
+                if (modal) {
+                    modal.hide();
+                }
+                loadEndpoints(currentFunctionId);
+            }
+        })
+        .catch(error => {
+            console.error('Error updating endpoint:', error);
+            alert('Ошибка при обновлении эндпоинта');
+        });
+    }
+}
+
+function deleteEndpoint(endpointId) {
+    if (confirm('Вы уверены, что хотите удалить этот эндпоинт?')) {
+        fetch(`/api/endpoints/${endpointId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.message) {
+                alert('Endpoint удален успешно!');
+                loadEndpoints(currentFunctionId);
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting endpoint:', error);
+            alert('Ошибка при удалении эндпоинта');
+        });
+    }
+}
+
+// Функции для редактирования и удаления заметок
+function editNote(noteId) {
+    // Получаем данные заметки
+    fetch(`/api/notes/${noteId}`)
+    .then(response => response.json())
+    .then(note => {
+        // Заполняем форму данными заметки
+        document.getElementById('noteTitle').value = note.title || '';
+        document.getElementById('noteContent').value = note.content || '';
+        
+        // Меняем кнопку на "Обновить" (кнопка находится в modal-footer)
+        const modal = document.getElementById('addNoteModal');
+        const submitBtn = modal.querySelector('.modal-footer .btn-primary');
+        submitBtn.textContent = 'Обновить Заметку';
+        submitBtn.onclick = function(e) {
+            e.preventDefault();
+            updateNote(noteId);
+        };
+        
+        // Показываем модальное окно
+        const noteModal = new bootstrap.Modal(modal);
+        noteModal.show();
+    })
+    .catch(error => {
+        console.error('Error loading note:', error);
+        alert('Ошибка при загрузке данных заметки');
+    });
+}
+
+function updateNote(noteId) {
+    const formData = {
+        title: document.getElementById('noteTitle').value,
+        content: document.getElementById('noteContent').value
+    };
+    
+    fetch(`/api/notes/${noteId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            alert('Заметка обновлена успешно!');
+            // Закрываем модальное окно
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addNoteModal'));
+            if (modal) {
+                modal.hide();
+            }
+            loadNotes(currentFunctionId);
+        }
+    })
+    .catch(error => {
+        console.error('Error updating note:', error);
+        alert('Ошибка при обновлении заметки');
+    });
+}
+
+function deleteNote(noteId) {
+    if (confirm('Вы уверены, что хотите удалить эту заметку?')) {
+        fetch(`/api/notes/${noteId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.message) {
+                alert('Заметка удалена успешно!');
+                loadNotes(currentFunctionId);
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting note:', error);
+            alert('Ошибка при удалении заметки');
+        });
+    }
+}
+
+// Функции для сброса форм
+function resetEndpointForm() {
+    document.getElementById('addEndpointForm').reset();
+    // Сбрасываем переменную оригинального метода
+    originalEndpointMethod = null;
+    // Закрываем модальное окно
+    const modal = bootstrap.Modal.getInstance(document.getElementById('addEndpointModal'));
+    if (modal) {
+        modal.hide();
+    }
+    // Ищем кнопку в modal-footer
+    const submitBtn = document.querySelector('#addEndpointModal .modal-footer .btn-primary');
+    if (submitBtn) {
+        submitBtn.textContent = 'Добавить Endpoint';
+        submitBtn.onclick = function(e) {
+            e.preventDefault();
+            addEndpoint();
+        };
+    }
+}
+
+function resetNoteForm() {
+    document.getElementById('addNoteForm').reset();
+    // Сбрасываем кнопку на "Добавить"
+    const modal = document.getElementById('addNoteModal');
+    const submitBtn = modal.querySelector('.modal-footer .btn-primary');
+    submitBtn.textContent = 'Добавить';
+    submitBtn.onclick = function(e) {
+        e.preventDefault();
+        addNote();
+    };
+}
+
+// Добавляем обработчики событий скрытия модальных окон для сброса форм
+document.addEventListener('DOMContentLoaded', function() {
+    const addEndpointModal = document.getElementById('addEndpointModal');
+    if (addEndpointModal) {
+        addEndpointModal.addEventListener('hidden.bs.modal', function () {
+            resetEndpointForm();
+        });
+    }
+    
+    const addNoteModal = document.getElementById('addNoteModal');
+    if (addNoteModal) {
+        addNoteModal.addEventListener('hidden.bs.modal', function () {
+            resetNoteForm();
+        });
+    }
+});
+
+function parseCertificateFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const certificateData = JSON.parse(e.target.result);
+            displayCertificateData(certificateData);
+            
+            // Сохраняем данные в поле формы для последующего сохранения
+            document.getElementById('editCertificates').value = JSON.stringify(certificateData, null, 2);
+            
+            // Автоматически сохраняем данные в базу
+            saveCertificatesData(JSON.stringify(certificateData, null, 2));
+        } catch (error) {
+            alert('Ошибка при парсинге файла: ' + error.message);
+        }
+    };
+    reader.readAsText(file);
+}
+
+function displayCertificateData(data) {
+    const certificatesDisplay = document.getElementById('certificatesDisplay');
+    
+    // Создаем таблицу для отображения данных
+    const tableHtml = `
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>IP:Port</th>
+                        <th>Организация</th>
+                        <th>Common Name</th>
+                        <th>SAN</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="certificatesTableBody">
+                    <tr>
+                        <td><code>${data.ip || 'Не указано'}</code></td>
+                        <td>${data.organization || 'Не указано'}</td>
+                        <td><code>${data.commonName || 'Не указано'}</code></td>
+                        <td><code>${data.san || 'Не указано'}</code></td>
+                        <td>
+                            <button class="btn btn-sm btn-danger" onclick="deleteCertificate(this)" title="Удалить сертификат">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    certificatesDisplay.innerHTML = tableHtml;
+}
+
+function saveCertificatesData(certificatesData) {
+    const websiteId = {{ website.id }};
+    
+    fetch(`/api/websites/${websiteId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            certificates: certificatesData
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            // Показываем уведомление об успешном сохранении
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show';
+            alert.innerHTML = `
+                <i class="fas fa-check-circle"></i> Данные сертификатов успешно сохранены!
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.querySelector('.container-fluid').insertBefore(alert, document.querySelector('.container-fluid').firstChild);
+            
+            // Автоматически скрываем уведомление через 3 секунды
+            setTimeout(() => {
+                alert.remove();
+            }, 3000);
+        } else {
+            alert('Ошибка при сохранении данных: ' + (data.error || 'Неизвестная ошибка'));
+        }
+    })
+    .catch(error => {
+        console.error('Ошибка:', error);
+        alert('Ошибка при сохранении данных: ' + error.message);
+    });
+}
+
+function deleteCertificate(button) {
+    if (confirm('Вы уверены, что хотите удалить этот сертификат?')) {
+        // Удаляем строку из таблицы
+        const row = button.closest('tr');
+        row.remove();
+        
+        // Очищаем данные сертификатов на сервере
+        const websiteId = {{ website.id }};
+        
+        fetch(`/api/websites/${websiteId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                certificates: ''
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.message) {
+                // Создаем уведомление об успешном удалении
+                const alert = document.createElement('div');
+                alert.className = 'alert alert-success alert-dismissible fade show';
+                alert.innerHTML = `
+                    <i class="fas fa-check-circle"></i> Сертификат успешно удален!
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                document.querySelector('.container-fluid').insertBefore(alert, document.querySelector('.container-fluid').firstChild);
+                
+                // Автоматически скрываем уведомление через 3 секунды
+                setTimeout(() => {
+                    alert.remove();
+                }, 3000);
+                
+                // Очищаем отображение сертификатов
+                document.getElementById('certificatesDisplay').innerHTML = '<p class="text-muted">Сертификаты не загружены</p>';
+                document.getElementById('editCertificates').value = '';
+            } else {
+                alert('Ошибка при удалении сертификата: ' + (data.error || 'Неизвестная ошибка'));
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка:', error);
+            alert('Ошибка при удалении сертификата: ' + error.message);
+        });
+    }
+}
+
+function parseEditCertificateFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const certificateData = JSON.parse(e.target.result);
+            // Заполняем текстовое поле в форме редактирования
+            document.getElementById('editCertificates').value = JSON.stringify(certificateData, null, 2);
+        } catch (error) {
+            alert('Ошибка при парсинге файла: ' + error.message);
+        }
+    };
+    reader.readAsText(file);
+}
+
+// Загружаем существующие данные сертификатов при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    const certificatesText = `{{ website.certificates|safe }}`;
+    if (certificatesText && certificatesText !== 'None' && certificatesText.trim() !== '') {
+        try {
+            const certificateData = JSON.parse(certificatesText);
+            displayCertificateData(certificateData);
+        } catch (error) {
+            // Если данные не в JSON формате, оставляем как есть
+            console.log('Сертификаты не в JSON формате');
+        }
+    }
+});
+
+// Функция для сохранения новой технологии
+function saveTechnology() {
+    const technologyName = document.getElementById('technologyName').value.trim();
+    const technologyVersion = document.getElementById('technologyVersion').value.trim();
+    
+    if (!technologyName) {
+        alert('Пожалуйста, введите название технологии');
+        return;
+    }
+    
+    // Отправляем данные на сервер
+    fetch(`/api/websites/${websiteId}/technologies`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            name: technologyName,
+            version: technologyVersion || null
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.id) {
+            // Закрываем модальное окно
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addTechnologyModal'));
+            modal.hide();
+            
+            // Очищаем форму
+            document.getElementById('technologyName').value = '';
+            document.getElementById('technologyVersion').value = '';
+            
+            // Добавляем новую технологию в таблицу
+            const techDisplay = document.getElementById('technologiesDisplay');
+            const existingTable = techDisplay.querySelector('table tbody');
+            
+            if (existingTable) {
+                // Если таблица уже существует, добавляем новую строку
+                const newRow = document.createElement('tr');
+                newRow.innerHTML = `
+                    <td><code>${technologyName}</code></td>
+                    <td>${technologyVersion || '-'}</td>
+                    <td>
+                        <button class="btn btn-outline-danger btn-sm" onclick="deleteTechnology(${data.id})" title="Удалить">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                existingTable.appendChild(newRow);
+            } else {
+                // Если таблицы нет, создаем ее
+                techDisplay.innerHTML = `
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Технология</th>
+                                    <th>Версия</th>
+                                    <th width="80">Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>${technologyName}</code></td>
+                                    <td>${technologyVersion || '-'}</td>
+                                    <td>
+                                        <button class="btn btn-outline-danger btn-sm" onclick="deleteTechnology(${data.id})" title="Удалить">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            // Показываем уведомление об успехе
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show';
+            alert.innerHTML = `
+                Технология успешно добавлена
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.querySelector('.container-fluid').prepend(alert);
+            
+            // Автоматически скрываем уведомление через 3 секунды
+            setTimeout(() => {
+                alert.remove();
+            }, 3000);
+        } else {
+            alert('Ошибка при добавлении технологии: ' + (data.error || 'Неизвестная ошибка'));
+        }
+    })
+    .catch(error => {
+        console.error('Ошибка:', error);
+        alert('Ошибка при добавлении технологии: ' + error.message);
+    });
+}
+
+// Функция для копирования всех портов в буфер обмена
+function copyPortsToClipboard() {
+    const portsTable = document.querySelector('#portsDisplay table tbody');
+    
+    if (!portsTable || portsTable.children.length === 0) {
+        alert('Нет портов для копирования');
+        return;
+    }
+    
+    // Собираем все номера портов из таблицы
+    const ports = [];
+    const rows = portsTable.querySelectorAll('tr');
+    
+    rows.forEach(row => {
+        const portCell = row.querySelector('td:first-child code');
+        if (portCell) {
+            ports.push(portCell.textContent.trim());
+        }
+    });
+    
+    if (ports.length === 0) {
+        alert('Нет портов для копирования');
+        return;
+    }
+    
+    // Объединяем порты через запятую без пробелов
+    const portsString = ports.join(',');
+    
+    // Проверяем поддержку Clipboard API (требует HTTPS)
+    if (navigator.clipboard && window.isSecureContext) {
+        // Используем современный Clipboard API
+        navigator.clipboard.writeText(portsString).then(() => {
+            showCopyNotification('Порты скопированы в буфер обмена: ' + portsString);
+        }).catch(err => {
+            console.error('Ошибка при копировании: ', err);
+            fallbackCopyToClipboard(portsString);
+        });
+    } else {
+        // Альтернативный метод для HTTP
+        fallbackCopyToClipboard(portsString);
+    }
+}
+
+// Альтернативный метод копирования для HTTP
+function fallbackCopyToClipboard(text) {
+    // Создаем временное текстовое поле
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+        // Пытаемся скопировать с помощью execCommand
+        const successful = document.execCommand('copy');
+        if (successful) {
+            showCopyNotification('Порты скопированы в буфер обмена: ' + text);
+        } else {
+            showCopyDialog(text);
+        }
+    } catch (err) {
+        console.error('Ошибка при копировании: ', err);
+        showCopyDialog(text);
+    } finally {
+        document.body.removeChild(textArea);
+    }
+}
+
+// Показываем диалог с текстом для ручного копирования
+function showCopyDialog(text) {
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+    `;
+    
+    const dialog = document.createElement('div');
+    dialog.style.cssText = `
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    `;
+    
+    dialog.innerHTML = `
+        <h4 style="margin-top: 0;">Скопируйте порты</h4>
+        <p>Выделите и скопируйте текст ниже (Ctrl+C):</p>
+        <textarea readonly style="width: 100%; height: 60px; font-family: monospace; border: 1px solid #ddd; padding: 8px; border-radius: 4px;">${text}</textarea>
+        <div style="margin-top: 15px; text-align: right;">
+            <button onclick="this.closest('.copy-modal').remove()" style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Закрыть</button>
+        </div>
+    `;
+    
+    modal.className = 'copy-modal';
+    modal.appendChild(dialog);
+    document.body.appendChild(modal);
+    
+    // Автоматически выделяем текст
+    const textarea = dialog.querySelector('textarea');
+    textarea.focus();
+    textarea.select();
+    
+    // Закрытие по клику вне диалога
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+    
+    // Закрытие по Escape
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            modal.remove();
+            document.removeEventListener('keydown', handleEscape);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
+}
+
+// Показываем уведомление об успешном копировании
+function showCopyNotification(message) {
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-success alert-dismissible fade show';
+    alert.innerHTML = `
+        <i class="fas fa-check-circle"></i> ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.querySelector('.container-fluid').insertBefore(alert, document.querySelector('.container-fluid').firstChild);
+    
+    // Автоматически скрываем уведомление через 3 секунды
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 3000);
+}
+
+// Загрузка портов по IP, привязанному к домену сайта
+async function loadIpPortsForDomain() {
+    const display = document.getElementById('ipPortsDisplay');
+    if (!display) return;
+    display.textContent = 'Загрузка...';
+    try {
+        const rawUrl = '{{ website.url | safe }}';
+        const domainName = rawUrl.replace(/^https?:\/\/(www\.)?/, '').split('/')[0].toLowerCase();
+        const projectId = {{ website.project.id if website.project else 'null' }};
+        if (!projectId) { display.textContent = 'Сайт не привязан к проекту'; return; }
+        const listRes = await fetch(`/api/projects/${projectId}/attack-surfaces`);
+        const listData = await listRes.json();
+        if (!listData.success || !listData.attack_surfaces || !listData.attack_surfaces.length) {
+            display.textContent = 'Нет Attack Surface для проекта';
+            return;
+        }
+        let foundDomain = null;
+        let attackSurfaceId = null;
+        for (const as of listData.attack_surfaces) {
+            const dRes = await fetch(`/api/attack-surfaces/${as.id}/domains`);
+            const dData = await dRes.json();
+            if (!dData.success || !dData.domains) continue;
+            const match = dData.domains.find(x => (x.domain || '').replace(/^https?:\/\/(www\.)?/, '').split('/')[0].toLowerCase() === domainName);
+            if (match) {
+                foundDomain = match;
+                attackSurfaceId = as.id;
+                break;
+            }
+        }
+        if (!foundDomain || !foundDomain.ip) { display.textContent = 'Домен не привязан к IP в Attack Surface'; return; }
+        const pRes = await fetch(`/api/attack-surfaces/${attackSurfaceId}/domains/${foundDomain.id}/ports`);
+        const pData = await pRes.json();
+        if (!pData.success) { display.textContent = 'Порты не найдены'; return; }
+        if (!pData.ports || !pData.ports.length) { display.textContent = 'Открытых портов по IP нет'; return; }
+        const rows = pData.ports.map(p => `<tr><td><code>${p.port}</code></td><td>${p.protocol}</td><td>${p.service||'-'}</td><td><span class="badge bg-${p.status==='open'?'success':'secondary'}">${p.status}</span></td></tr>`).join('');
+        display.innerHTML = `<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Порт</th><th>Протокол</th><th>Сервис</th><th>Статус</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    } catch (e) {
+        document.getElementById('ipPortsDisplay').textContent = 'Ошибка загрузки портов';
+    }
+}
+window.loadIpPortsForDomain = loadIpPortsForDomain;
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof window.loadIpPortsForDomain === 'function') {
+        window.loadIpPortsForDomain();
+    }
+});
+
+function openStatusPicker(ev, websiteId) {
+    try { ev.preventDefault(); ev.stopPropagation(); } catch (e) {}
+    const existing = document.getElementById('statusPickerMenu');
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+    const menu = document.createElement('div');
+    menu.id = 'statusPickerMenu';
+    menu.style.position = 'absolute';
+    menu.style.zIndex = '9999';
+    menu.style.background = '#fff';
+    menu.style.border = '1px solid rgba(0,0,0,0.15)';
+    menu.style.borderRadius = '0.25rem';
+    menu.style.boxShadow = '0 0.5rem 1rem rgba(0,0,0,0.15)';
+    menu.style.padding = '0.25rem';
+    const statuses = ['Не начат','В работе','Закрыт','Вернуться позже'];
+    statuses.forEach(s => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'dropdown-item';
+        btn.textContent = s;
+        btn.style.display = 'block';
+        btn.style.width = '100%';
+        btn.style.textAlign = 'left';
+        btn.onclick = function(e){ try{ e.stopPropagation(); }catch(_){} setWebsiteStatus(websiteId, s); if (menu && menu.parentNode) menu.parentNode.removeChild(menu); };
+        menu.appendChild(btn);
+    });
+    document.body.appendChild(menu);
+    const x = (ev.pageX != null ? ev.pageX : (ev.clientX || 0) + window.scrollX);
+    const y = (ev.pageY != null ? ev.pageY : (ev.clientY || 0) + window.scrollY);
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    function closeOnOutside(e){
+        if (!menu.contains(e.target)) {
+            if (menu && menu.parentNode) menu.parentNode.removeChild(menu);
+            document.removeEventListener('click', closeOnOutside, true);
+        }
+    }
+    setTimeout(function(){ document.addEventListener('click', closeOnOutside, true); }, 0);
+}
+
+async function setWebsiteStatus(websiteId, status) {
+    try {
+        const r = await fetch(`/api/websites/${websiteId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+        await r.json();
+    } catch (e) {}
+    try {
+        const badge = document.getElementById('websiteStatusBadge');
+        if (badge) {
+            badge.textContent = status;
+            badge.className = 'badge ' + (status === 'В работе' ? 'bg-warning text-dark' : (status === 'Закрыт' ? 'bg-success' : (status === 'Вернуться позже' ? 'bg-info text-dark' : 'bg-secondary'))) + ' mb-3';
+        }
+    } catch (e) {}
+    try {
+        const ev = new CustomEvent('websiteUpdated', { detail: { id: Number(websiteId), status } });
+        window.dispatchEvent(ev);
+    } catch (e) {}
+    try {
+        const prev = localStorage.getItem('__websiteUpdated');
+        const payload = { id: Number(websiteId), status, ts: Date.now() };
+        localStorage.setItem('__websiteUpdated', JSON.stringify(payload));
+    } catch (e) {}
+}
+
+window.openStatusPicker = openStatusPicker;
+
+</script>
+{% endblock %}
+function openStatusPicker(ev, websiteId) {
+    try { ev.preventDefault(); ev.stopPropagation(); } catch (e) {}
+    const existing = document.getElementById('statusPickerMenu');
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+    const menu = document.createElement('div');
+    menu.id = 'statusPickerMenu';
+    menu.style.position = 'absolute';
+    menu.style.zIndex = '9999';
+    menu.style.background = '#fff';
+    menu.style.border = '1px solid rgba(0,0,0,0.15)';
+    menu.style.borderRadius = '0.25rem';
+    menu.style.boxShadow = '0 0.5rem 1rem rgba(0,0,0,0.15)';
+    menu.style.padding = '0.25rem';
+    const statuses = ['Не начат','В работе','Закрыт','Вернуться позже'];
+    statuses.forEach(s => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'dropdown-item';
+        btn.textContent = s;
+        btn.style.display = 'block';
+        btn.style.width = '100%';
+        btn.style.textAlign = 'left';
+        btn.onclick = function(e){ try{ e.stopPropagation(); }catch(_){} setWebsiteStatus(websiteId, s); if (menu && menu.parentNode) menu.parentNode.removeChild(menu); };
+        menu.appendChild(btn);
+    });
+    document.body.appendChild(menu);
+    const x = (ev.clientX || 0) + window.scrollX;
+    const y = (ev.clientY || 0) + window.scrollY;
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    function closeOnOutside(e){
+        if (!menu.contains(e.target)) {
+            if (menu && menu.parentNode) menu.parentNode.removeChild(menu);
+            document.removeEventListener('click', closeOnOutside, true);
+        }
+    }
+    setTimeout(function(){ document.addEventListener('click', closeOnOutside, true); }, 0);
+}
+
+async function setWebsiteStatus(websiteId, status) {
+    try {
+        const r = await fetch(`/api/websites/${websiteId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+        await r.json();
+    } catch (e) {}
+    try {
+        const badge = document.getElementById('websiteStatusBadge');
+        if (badge) {
+            badge.textContent = status;
+            badge.className = 'badge ' + (status === 'В работе' ? 'bg-warning text-dark' : (status === 'Закрыт' ? 'bg-success' : (status === 'Вернуться позже' ? 'bg-info text-dark' : 'bg-secondary'))) + ' mb-3';
+        }
+    } catch (e) {}
+    try {
+        const ev = new CustomEvent('websiteUpdated', { detail: { id: Number(websiteId), status } });
+        window.dispatchEvent(ev);
+    } catch (e) {}
+    try {
+        const payload = { id: Number(websiteId), status, ts: Date.now() };
+        localStorage.setItem('__websiteUpdated', JSON.stringify(payload));
+    } catch (e) {}
+    try { if (typeof updateAttackSurfaceDisplay === 'function') updateAttackSurfaceDisplay(); } catch (e) {}
+}

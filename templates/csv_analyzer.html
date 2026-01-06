@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анализ и фильтрация CSV данных</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #2d2d2d;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            padding: 30px;
+        }
+        h1, h2 {
+            color: #ffffff;
+            margin-bottom: 20px;
+        }
+        .upload-section {
+            border: 2px dashed #555;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 30px;
+            background-color: #3d3d3d;
+            color: #e0e0e0;
+        }
+        .upload-section.dragover {
+            border-color: #6ea8fe;
+            background-color: #1f4e79;
+        }
+        .file-input {
+            display: none;
+        }
+        .upload-btn {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .upload-btn:hover {
+            background: #0056b3;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stats-card {
+            background: #3d3d3d;
+            border: 1px solid #555;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .stats-card h3 {
+            margin-top: 0;
+            color: #ffffff;
+            border-bottom: 2px solid #6ea8fe;
+            padding-bottom: 10px;
+        }
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #555;
+            color: #e0e0e0;
+        }
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+        .stat-value {
+            font-weight: bold;
+            color: #6ea8fe;
+        }
+        .filter-section {
+            background: #3d3d3d;
+            border: 1px solid #555;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .filter-group {
+            margin-bottom: 20px;
+        }
+        .filter-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #e0e0e0;
+        }
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #555;
+            padding: 15px;
+            border-radius: 6px;
+            background: #2d2d2d;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #e0e0e0;
+        }
+        .checkbox-item input[type="checkbox"] {
+            margin: 0;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .btn-primary {
+            background: #28a745;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #218838;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        .hidden {
+            display: none;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .error {
+            background: #5d1a1d;
+            color: #f8d7da;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+            border: 1px solid #721c24;
+        }
+        .success {
+            background: #1e4620;
+            color: #d4edda;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+            border: 1px solid #155724;
+        }
+        .examples {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #adb5bd;
+        }
+        .example-item {
+            background: #3d3d3d;
+            padding: 5px 8px;
+            margin: 2px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #e0e0e0;
+        }
+        
+        /* Стили для таблиц групп уникальных ответов */
+        .response-groups-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .response-groups-table th {
+            background-color: #3d3d3d;
+            border: 1px solid #555;
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            color: #ffffff;
+        }
+        
+        .response-groups-table td {
+            border: 1px solid #555;
+            padding: 10px 8px;
+            vertical-align: top;
+            color: #e0e0e0;
+        }
+        
+        .response-groups-table tr:nth-child(even) {
+            background-color: #3d3d3d;
+        }
+        
+        .response-groups-table tr:hover {
+            background-color: #4d4d4d;
+        }
+        
+        .group-id {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            background-color: #555;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #e0e0e0;
+        }
+        
+        .group-count {
+            font-weight: bold;
+            color: #6ea8fe;
+            text-align: center;
+        }
+        
+        .group-characteristics {
+            font-size: 12px;
+            color: #adb5bd;
+        }
+        
+        .group-examples {
+            font-size: 12px;
+            max-width: 300px;
+            word-wrap: break-word;
+        }
+        
+        .status-section {
+            margin-bottom: 30px;
+        }
+        
+        .status-title {
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #dee2e6;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .status-200 { color: #28a745; }
+         .status-300 { color: #ffc107; }
+         .status-400 { color: #dc3545; }
+         .status-500 { color: #6f42c1; }
+         .status-other { color: #6c757d; }
+         
+         /* Стили для отдельной секции групп */
+         #responseGroupsSection {
+             background: #3d3d3d;
+             border: 1px solid #555;
+             border-radius: 8px;
+             padding: 0;
+             margin: 30px 0;
+         }
+         
+         #responseGroupsSection h2 {
+             background: linear-gradient(135deg, #6ea8fe, #0056b3);
+             color: white;
+             margin: 0;
+             padding: 20px;
+             border-radius: 8px 8px 0 0;
+             font-size: 20px;
+             font-weight: 600;
+         }
+         
+         #responseGroupsByStatus {
+              background: #2d2d2d;
+              border-radius: 0 0 8px 8px;
+              padding: 25px;
+              margin: 0;
+          }
+          
+          /* Стили для кнопок управления группами */
+          .group-actions {
+              display: flex;
+              gap: 10px;
+              align-items: center;
+              flex-wrap: wrap;
+          }
+          
+          .btn {
+              padding: 8px 16px;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+              font-size: 14px;
+              font-weight: 500;
+              transition: all 0.2s ease;
+          }
+          
+          .btn:disabled {
+              opacity: 0.6;
+              cursor: not-allowed;
+          }
+          
+          .btn-danger {
+              background-color: #dc3545;
+              color: white;
+          }
+          
+          .btn-danger:hover:not(:disabled) {
+              background-color: #c82333;
+          }
+          
+          .btn-secondary {
+              background-color: #6c757d;
+              color: white;
+          }
+          
+          .btn-secondary:hover {
+              background-color: #5a6268;
+          }
+          
+          .btn-primary {
+              background-color: #007bff;
+              color: white;
+          }
+          
+          .btn-primary:hover {
+              background-color: #0056b3;
+          }
+          
+          .btn-sm {
+              padding: 6px 12px;
+              font-size: 12px;
+          }
+          
+          /* Стили для чекбоксов */
+          .group-checkbox, input[id^="status_"] {
+              width: 16px;
+              height: 16px;
+              cursor: pointer;
+          }
+          
+          /* Улучшенные стили для заголовков статусов */
+          .status-section {
+              margin-bottom: 30px;
+              border: 1px solid #555;
+              border-radius: 8px;
+              overflow: hidden;
+          }
+          
+          .status-title {
+              background: linear-gradient(135deg, #3d3d3d, #4d4d4d);
+              padding: 15px 20px;
+              margin: 0;
+              font-size: 18px;
+              font-weight: 600;
+              border-bottom: 1px solid #555;
+              color: #ffffff;
+          }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Анализ и фильтрация CSV данных фаззинга</h1>
+        
+        <div class="upload-section" id="uploadSection">
+            <h2>Загрузите CSV файл для анализа</h2>
+            <p>Перетащите файл сюда или нажмите кнопку для выбора</p>
+            <input type="file" id="csvFile" class="file-input" accept=".csv" />
+            <button class="upload-btn" onclick="document.getElementById('csvFile').click()">Выбрать файл</button>
+        </div>
+        
+        <div id="analysisResults" class="hidden">
+            <!-- Отдельная секция для групп уникальных ответов -->
+            <div id="responseGroupsSection" class="hidden">
+                <h2>Группы уникальных ответов по статус-кодам</h2>
+                <div class="group-actions" style="margin-bottom: 20px;">
+                    <button onclick="deleteSelectedGroups()" class="btn btn-danger" id="deleteSelectedBtn" disabled>
+                        Удалить выбранные группы
+                    </button>
+                    <button onclick="selectAllGroups()" class="btn btn-secondary">
+                        Выбрать все
+                    </button>
+                    <button onclick="deselectAllGroups()" class="btn btn-secondary">
+                        Снять выделение
+                    </button>
+                    <button onclick="saveChangesToDatabase()" class="btn btn-primary" id="saveChangesBtn" style="margin-left: 20px;">
+                        Сохранить изменения в базу
+                    </button>
+                </div>
+                <div id="responseGroupsByStatus"></div>
+            </div>
+        </div>
+        
+        <div id="messages"></div>
+    </div>
+    
+    <script>
+        let csvData = null;
+        let analysisStats = null;
+        let websiteId = {{ website.id }};
+        
+        if (!websiteId) {
+            showMessage('Ошибка: ID сайта не указан в URL', 'error');
+        }
+        
+        // Обработка загрузки файла
+        document.getElementById('csvFile').addEventListener('change', handleFileSelect);
+        
+        // Drag & Drop
+        const uploadSection = document.getElementById('uploadSection');
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+        
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+        
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+        
+        function handleFile(file) {
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                showMessage('Пожалуйста, выберите CSV файл', 'error');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                csvData = e.target.result;
+                analyzeCSV();
+            };
+            reader.readAsText(file);
+        }
+        
+        async function analyzeCSV() {
+            if (!csvData || !websiteId) return;
+            
+            showMessage('Анализ CSV данных...', 'loading');
+            
+            try {
+                const response = await fetch(`/api/websites/${websiteId}/analyze-fuzz`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ csv_data: csvData })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    analysisStats = result.stats;
+                    displayAnalysisResults(result.stats);
+                    showMessage('Анализ завершен успешно', 'success');
+                } else {
+                    showMessage(`Ошибка анализа: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`Ошибка сети: ${error.message}`, 'error');
+            }
+        }
+        
+        function displayAnalysisResults(stats) {
+            // Скрываем секцию групп по умолчанию
+            document.getElementById('responseGroupsSection').classList.add('hidden');
+            
+            console.log('=== АНАЛИЗ ПОЛУЧЕННЫХ ДАННЫХ С СЕРВЕРА ===');
+            console.log('Полная структура stats:', stats);
+            console.log('response_groups:', stats.response_groups);
+            
+            // Отображаем группы уникальных ответов в отдельной секции
+            if (stats.response_groups && Object.keys(stats.response_groups).length > 0) {
+                document.getElementById('responseGroupsSection').classList.remove('hidden');
+                const groupsByStatusContainer = document.getElementById('responseGroupsByStatus');
+                groupsByStatusContainer.innerHTML = ''; // Очищаем контейнер
+                
+                // Логируем каждую группу перед обработкой
+                Object.entries(stats.response_groups).forEach(([groupId, group]) => {
+                    console.log(`Группа ${groupId} с сервера:`, group);
+                    console.log(`  - status_code: ${group.status_code}`);
+                    console.log(`  - count: ${group.count}`);
+                    console.log(`  - examples: ${group.examples ? group.examples.length : 'НЕТ'}`);
+                    console.log(`  - records: ${group.records ? group.records.length : 'НЕТ'}`);
+                });
+                
+                // Группируем по статус-кодам
+                const groupsByStatus = {};
+                Object.entries(stats.response_groups).forEach(([groupId, group]) => {
+                    // Используем status_code из самой группы, а не из examples
+                    const statusCode = group.status_code || (group.examples && group.examples.length > 0 ? group.examples[0].status_code : 'unknown');
+                    console.log(`Группа ${groupId} имеет статус: ${statusCode}`);
+                    
+                    if (!groupsByStatus[statusCode]) {
+                        groupsByStatus[statusCode] = [];
+                    }
+                    groupsByStatus[statusCode].push({ groupId, ...group });
+                });
+                
+                // Создаем таблицу для каждого статус-кода
+                Object.entries(groupsByStatus)
+                    .sort((a, b) => parseInt(a[0]) - parseInt(b[0]))
+                    .forEach(([statusCode, groups]) => {
+                        const statusSection = document.createElement('div');
+                        statusSection.className = 'status-section';
+                        
+                        const statusTitle = document.createElement('h4');
+                        statusTitle.textContent = `HTTP ${statusCode} (${groups.length} групп)`;
+                        statusTitle.className = 'status-title';
+                        
+                        // Добавляем класс для цвета статуса
+                        const statusNum = parseInt(statusCode);
+                        if (statusNum >= 200 && statusNum < 300) statusTitle.classList.add('status-200');
+                        else if (statusNum >= 300 && statusNum < 400) statusTitle.classList.add('status-300');
+                        else if (statusNum >= 400 && statusNum < 500) statusTitle.classList.add('status-400');
+                        else if (statusNum >= 500) statusTitle.classList.add('status-500');
+                        else statusTitle.classList.add('status-other');
+                        
+                        statusSection.appendChild(statusTitle);
+                        
+                        // Добавляем кнопку для удаления всех групп статуса
+                        const statusHeader = document.createElement('div');
+                        statusHeader.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;';
+                        statusHeader.innerHTML = `
+                            <span></span>
+                            <button onclick="deleteGroupsByStatus('${statusCode}')" class="btn btn-danger" style="padding: 8px 16px; font-size: 14px;">
+                                Удалить все группы статуса ${statusCode}
+                            </button>
+                        `;
+                        statusSection.appendChild(statusHeader);
+                        
+                        const table = document.createElement('table');
+                        table.className = 'response-groups-table';
+                        
+                        // Заголовок таблицы с чекбоксами
+                        table.innerHTML = `
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">
+                                        <input type="checkbox" onchange="toggleStatusGroups('${statusCode}', this.checked)" id="status_${statusCode}_all">
+                                    </th>
+                                    <th>Группа</th>
+                                    <th>Количество</th>
+                                    <th>Характеристики</th>
+                                    <th>Примеры</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        `;
+                        
+                        const tbody = table.querySelector('tbody');
+                        
+                        // Сортируем группы по количеству записей
+                        groups.sort((a, b) => b.count - a.count).forEach(group => {
+                            const row = document.createElement('tr');
+                            
+                            const examplesHtml = group.examples.slice(0, 3).map(ex => 
+                                `${ex.fuzz}`
+                            ).join(', ');
+                            
+                            const characteristics = `${group.examples[0].content_length}b, ${group.examples[0].content_lines}л, ${group.examples[0].content_words}сл`;
+                            
+                            row.innerHTML = `
+                                <td>
+                                    <input type="checkbox" class="group-checkbox" data-group-id="${group.groupId}" data-status="${statusCode}" onchange="updateDeleteButton()">
+                                </td>
+                                <td><span class="group-id">${group.groupId}</span></td>
+                                <td class="group-count">${group.count}</td>
+                                <td class="group-characteristics">${characteristics}</td>
+                                <td class="group-examples" title="${group.examples.map(ex => ex.fuzz).join(', ')}">${examplesHtml}${group.examples.length > 3 ? '...' : ''}</td>
+                            `;
+                            
+                            tbody.appendChild(row);
+                        });
+                        
+                        statusSection.appendChild(table);
+                        groupsByStatusContainer.appendChild(statusSection);
+                    });
+            }
+            
+            // Показываем результаты
+            document.getElementById('analysisResults').classList.remove('hidden');
+            
+            // Обновляем кнопку удаления
+            updateDeleteButton();
+        }
+        
+        // Функции для управления чекбоксами и удаления групп
+        function toggleStatusGroups(statusCode, checked) {
+            const checkboxes = document.querySelectorAll(`input[data-status="${statusCode}"]`);
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = checked;
+            });
+            updateDeleteButton();
+        }
+        
+        function selectAllGroups() {
+            const checkboxes = document.querySelectorAll('.group-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = true;
+            });
+            // Обновляем чекбоксы статусов
+            updateStatusCheckboxes();
+            updateDeleteButton();
+        }
+        
+        function deselectAllGroups() {
+            const checkboxes = document.querySelectorAll('.group-checkbox, input[id^="status_"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            updateDeleteButton();
+        }
+        
+        function updateStatusCheckboxes() {
+            const statusCodes = [...new Set(Array.from(document.querySelectorAll('.group-checkbox')).map(cb => cb.dataset.status))];
+            statusCodes.forEach(statusCode => {
+                const statusCheckboxes = document.querySelectorAll(`input[data-status="${statusCode}"]`);
+                const statusHeaderCheckbox = document.getElementById(`status_${statusCode}_all`);
+                if (statusHeaderCheckbox) {
+                    const allChecked = Array.from(statusCheckboxes).every(cb => cb.checked);
+                    statusHeaderCheckbox.checked = allChecked;
+                }
+            });
+        }
+        
+        function updateDeleteButton() {
+            const selectedCheckboxes = document.querySelectorAll('.group-checkbox:checked');
+            const deleteBtn = document.getElementById('deleteSelectedBtn');
+            deleteBtn.disabled = selectedCheckboxes.length === 0;
+            deleteBtn.textContent = `Удалить выбранные группы (${selectedCheckboxes.length})`;
+        }
+        
+        function deleteSelectedGroups() {
+            const selectedCheckboxes = document.querySelectorAll('.group-checkbox:checked');
+            if (selectedCheckboxes.length === 0) {
+                alert('Выберите группы для удаления');
+                return;
+            }
+            
+            if (confirm(`Вы уверены, что хотите удалить ${selectedCheckboxes.length} выбранных групп?`)) {
+                selectedCheckboxes.forEach(checkbox => {
+                    const groupId = checkbox.dataset.groupId;
+                    // Удаляем группу из analysisStats
+                    if (analysisStats && analysisStats.response_groups && analysisStats.response_groups[groupId]) {
+                        console.log(`Удаляем группу ${groupId} из analysisStats`);
+                        delete analysisStats.response_groups[groupId];
+                    }
+                    const row = checkbox.closest('tr');
+                    row.remove();
+                });
+                
+                // Логируем состояние после удаления
+                console.log('Оставшиеся группы после удаления:', Object.keys(analysisStats.response_groups || {}));
+                
+                updateDeleteButton();
+                updateStatusCheckboxes();
+                // Удаляем пустые секции статусов
+                removeEmptyStatusSections();
+            }
+        }
+        
+        function deleteGroupsByStatus(statusCode) {
+            const statusCheckboxes = document.querySelectorAll(`input[data-status="${statusCode}"]`);
+            if (statusCheckboxes.length === 0) return;
+            
+            if (confirm(`Вы уверены, что хотите удалить все ${statusCheckboxes.length} групп со статусом ${statusCode}?`)) {
+                statusCheckboxes.forEach(checkbox => {
+                    const groupId = checkbox.dataset.groupId;
+                    // Удаляем группу из analysisStats
+                    if (analysisStats && analysisStats.response_groups && analysisStats.response_groups[groupId]) {
+                        console.log(`Удаляем группу ${groupId} со статусом ${statusCode} из analysisStats`);
+                        delete analysisStats.response_groups[groupId];
+                    }
+                    const row = checkbox.closest('tr');
+                    row.remove();
+                });
+                
+                // Логируем состояние после удаления
+                console.log('Оставшиеся группы после удаления по статусу:', Object.keys(analysisStats.response_groups || {}));
+                
+                updateDeleteButton();
+                removeEmptyStatusSections();
+            }
+        }
+        
+        function removeEmptyStatusSections() {
+            const statusSections = document.querySelectorAll('.status-section');
+            statusSections.forEach(section => {
+                const tbody = section.querySelector('tbody');
+                if (!tbody || tbody.children.length === 0) {
+                    section.remove();
+                }
+            });
+            
+            // Проверяем, остались ли группы
+            const remainingGroups = document.querySelectorAll('.group-checkbox');
+            if (remainingGroups.length === 0) {
+                document.getElementById('responseGroupsSection').classList.add('hidden');
+            }
+        }
+        
+        async function saveChangesToDatabase() {
+            console.log('Начало функции saveChangesToDatabase');
+            console.log('csvData:', csvData);
+            console.log('websiteId:', websiteId);
+            console.log('analysisStats:', analysisStats);
+            
+            if (!csvData || !websiteId || !analysisStats) {
+                showMessage('Нет данных для сохранения', 'error');
+                return;
+            }
+            
+            // Проверяем, есть ли оставшиеся группы в analysisStats
+            const remainingGroupIds = Object.keys(analysisStats.response_groups || {});
+            console.log('ID оставшихся групп в analysisStats:', remainingGroupIds);
+            
+            if (remainingGroupIds.length === 0) {
+                showMessage('Нет групп для сохранения', 'error');
+                return;
+            }
+            
+            // Создаем структуру отфильтрованных данных в правильном формате
+            const filteredStats = {
+                response_groups: analysisStats.response_groups
+            };
+            
+            // Детальное логирование каждой группы
+            console.log('=== ДЕТАЛЬНЫЙ АНАЛИЗ ОТПРАВЛЯЕМЫХ ДАННЫХ ===');
+            Object.keys(filteredStats.response_groups).forEach(groupId => {
+                const group = filteredStats.response_groups[groupId];
+                console.log(`Группа ${groupId}:`);
+                console.log(`  - Полная структура группы:`, group);
+                console.log(`  - Статус: ${group.status_code}`);
+                console.log(`  - Размер (count): ${group.count}`);
+                console.log(`  - Fingerprint: ${group.fingerprint}`);
+                console.log(`  - Количество records: ${group.records ? group.records.length : 'НЕТ'}`);
+                console.log(`  - Количество examples: ${group.examples ? group.examples.length : 'НЕТ'}`);
+                if (group.records && group.records.length > 0) {
+                    console.log(`  - Первая запись records:`, group.records[0]);
+                }
+                if (group.examples && group.examples.length > 0) {
+                    console.log(`  - Первая запись examples:`, group.examples[0]);
+                }
+            });
+             console.log('Отправляемые данные:', filteredStats);
+            showMessage('Сохранение данных в базу...', 'loading');
+            
+            try {
+                const requestData = { filtered_stats: filteredStats };
+                console.log('Полные данные запроса:', requestData);
+                
+                const response = await fetch(`/api/websites/${websiteId}/import-fuzz`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                console.log('Статус ответа:', response.status);
+                const result = await response.json();
+                console.log('Ответ сервера:', result);
+                
+                if (response.ok) {
+                    showMessage(`Данные успешно сохранены в базу! Импортировано: файлы (${result.stats.files_count}), каталоги (${result.stats.directories_count}), маршруты (${result.stats.routes_count})`, 'success');
+                    
+                    // Автоматический редирект через 2 секунды
+                    setTimeout(() => {
+                        window.location.href = `/website/${websiteId}#basicInfo`;
+                    }, 2000);
+                } else {
+                    showMessage(`Ошибка сохранения: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Ошибка при отправке:', error);
+                showMessage(`Ошибка сети: ${error.message}`, 'error');
+            }
+        }
+        
+
+        
+
+        
+
+        
+
+        
+        function showMessage(message, type) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = `<div class="${type}">${message}</div>`;
+            
+            if (type === 'success' || type === 'error') {
+                setTimeout(() => {
+                    messagesDiv.innerHTML = '';
+                }, 5000);
+            }
+        }
+    </script>
+</body>
+</html>

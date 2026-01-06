@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}PenTest Notes{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vis-network@10.0.1/styles/vis-network.min.css">
+    <style>
+        /* Темная цветовая схема */
+        body {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        
+        .sidebar {
+            min-height: 100vh;
+            background-color: #2d2d2d;
+            border-right: 1px solid #404040;
+        }
+        
+        /* Карточки и контейнеры */
+        .card {
+            background-color: #2d2d2d;
+            border: 1px solid #404040;
+            color: #e0e0e0;
+        }
+        
+        .card-header {
+            background-color: #3d3d3d;
+            border-bottom: 1px solid #404040;
+            color: #e0e0e0;
+        }
+        
+        .card-body {
+            color: #e0e0e0;
+        }
+        
+        .card-title {
+            color: #ffffff;
+        }
+        
+        .card-text {
+            color: #e0e0e0;
+        }
+        
+        /* Модальные окна */
+        .modal-content {
+            background-color: #2d2d2d;
+            border: 1px solid #404040;
+            color: #e0e0e0;
+        }
+        
+        .modal-header {
+            background-color: #3d3d3d;
+            border-bottom: 1px solid #404040;
+            color: #e0e0e0;
+        }
+        
+        .modal-body {
+            color: #e0e0e0;
+        }
+        
+        .modal-footer {
+            background-color: #3d3d3d;
+            border-top: 1px solid #404040;
+        }
+        
+        .modal-title {
+            color: #ffffff;
+        }
+        
+        /* Формы */
+        .form-control, .form-select {
+            background-color: #3d3d3d;
+            border: 1px solid #555;
+            color: #e0e0e0;
+        }
+        .form-control[readonly], .form-select[readonly], .form-control:disabled, .form-select:disabled {
+            background-color: #3d3d3d;
+            border: 1px solid #555;
+            color: #e0e0e0;
+            opacity: 1;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            background-color: #3d3d3d;
+            border-color: #0d6efd;
+            color: #e0e0e0;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        }
+        
+        .form-control::placeholder {
+            color: #adb5bd;
+        }
+        
+        .form-label {
+            color: #e0e0e0;
+        }
+        
+        /* Кнопки */
+        .btn-outline-primary {
+            color: #6ea8fe;
+            border-color: #6ea8fe;
+        }
+        
+        .btn-outline-primary:hover {
+            background-color: #6ea8fe;
+            border-color: #6ea8fe;
+            color: #000;
+        }
+        
+        .btn-outline-secondary {
+            color: #adb5bd;
+            border-color: #adb5bd;
+        }
+        
+        .btn-outline-secondary:hover {
+            background-color: #adb5bd;
+            border-color: #adb5bd;
+            color: #000;
+        }
+        
+        /* Списки и элементы */
+        .list-group-item {
+            background-color: #2d2d2d;
+            border: 1px solid #404040;
+            color: #e0e0e0;
+        }
+        
+        .list-group-item:hover {
+            background-color: #3d3d3d;
+        }
+        
+        .list-group-item a {
+            color: #6ea8fe;
+            text-decoration: none;
+        }
+        
+        .list-group-item a:hover {
+            color: #ffffff;
+        }
+        
+        /* Хлебные крошки */
+        .breadcrumb {
+            background-color: #3d3d3d;
+        }
+        
+        .breadcrumb-item {
+            color: #e0e0e0;
+        }
+        
+        .breadcrumb-item a {
+            color: #6ea8fe;
+        }
+        
+        .breadcrumb-item.active {
+            color: #adb5bd;
+        }
+        
+        .status-badge {
+            font-size: 0.75rem;
+        }
+        .function-tree {
+            margin-left: 20px;
+        }
+        .function-item {
+            padding: 5px 10px;
+            margin: 2px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            color: #e0e0e0;
+        }
+        .function-item:hover {
+            background-color: #404040;
+        }
+        .function-item.active {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .endpoint-method {
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+        }
+        .method-get { background-color: #28a745; color: white; }
+        .method-post { background-color: #007bff; color: white; }
+        .method-put { background-color: #ffc107; color: black; }
+        .method-delete { background-color: #dc3545; color: white; }
+        .note-card {
+            border-left: 4px solid #0d6efd;
+            background-color: #2d2d2d;
+        }
+        .parent-function {
+            position: relative;
+            border-radius: 0 !important;
+            margin: 2px 0 !important;
+            padding: 6px 10px !important;
+            box-shadow: 0 1px 2px rgba(13,110,253,0.1) !important;
+            transition: all 0.2s ease !important;
+            background-color: #f8f9fa;
+            color: #212529 !important;
+            border: 1px solid #dee2e6;
+        }
+        .parent-function:hover {
+            box-shadow: 0 2px 4px rgba(13,110,253,0.15) !important;
+            transform: translateY(-1px) !important;
+        }
+        .parent-function::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #0d6efd, #0056b3);
+            border-radius: 0;
+        }
+        
+        .parent-function * {
+            color: #212529 !important;
+        }
+        
+        .parent-function .text-muted {
+            color: #6c757d !important;
+        }
+        
+        .parent-function .text-primary {
+            color: #0d6efd !important;
+        }
+        
+        /* Таблицы */
+        .table {
+            color: #e0e0e0;
+            --bs-table-bg: #2d2d2d;
+            --bs-table-striped-bg: #3d3d3d;
+            --bs-table-color: #e0e0e0;
+        }
+        
+        .table-dark {
+            --bs-table-bg: #2d2d2d;
+            --bs-table-striped-bg: #3d3d3d;
+            --bs-table-color: #e0e0e0;
+        }
+        
+        .table th {
+            color: #ffffff !important;
+            border-color: #404040;
+            background-color: #3d3d3d;
+        }
+        
+        .table td {
+            color: #e0e0e0 !important;
+            border-color: #404040;
+        }
+        
+        .table-striped > tbody > tr:nth-of-type(odd) > td {
+            background-color: #3d3d3d;
+        }
+        
+        .table code {
+            color: #f8f9fa !important;
+            background-color: #495057;
+        }
+        
+        /* Алерты */
+        .alert-info {
+            background-color: #1f4e79;
+            border-color: #1f4e79;
+            color: #b8daff;
+        }
+        
+        /* Навигация по сайтам */
+        .bg-light {
+            background-color: #3d3d3d !important;
+        }
+        
+        .border-primary {
+            border-color: #0d6efd !important;
+        }
+        
+        .text-primary {
+            color: #6ea8fe !important;
+        }
+        
+        /* Общие элементы текста */
+        h1, h2, h3, h4, h5, h6 {
+            color: #ffffff;
+        }
+        
+        p {
+            color: #e0e0e0;
+        }
+        
+        .text-muted {
+            color: #adb5bd !important;
+        }
+        
+        /* Ссылки */
+        a {
+            color: #6ea8fe;
+        }
+        
+        a:hover {
+            color: #ffffff;
+        }
+        
+        /* Бейджи */
+        .badge {
+            color: #ffffff;
+        }
+        
+        /* Дополнительные элементы */
+        .text-dark {
+            color: #e0e0e0 !important;
+        }
+        
+        .bg-white {
+            background-color: #2d2d2d !important;
+        }
+        
+        .border {
+            border-color: #404040 !important;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-shield-alt"></i> PenTest Notes
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('index') }}">
+                    <i class="fas fa-home"></i> Главная
+                </a>
+                <a class="nav-link" href="{{ url_for('attack_surface') }}">
+                    <i class="fas fa-network-wired"></i> Attack Surface
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <!-- Модальные окна -->
+    <div class="modal fade" id="addWebsiteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Добавить новый сайт</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addWebsiteForm">
+                        <div class="mb-3">
+                            <label for="websiteName" class="form-label">Название сайта</label>
+                            <input type="text" class="form-control" id="websiteName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="websiteUrl" class="form-label">URL</label>
+                            <input type="url" class="form-control" id="websiteUrl" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="websiteStatus" class="form-label">Статус</label>
+                            <select class="form-select" id="websiteStatus">
+                                <option value="Не начат">Не начат</option>
+                                <option value="В работе">В работе</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="addWebsite()">Добавить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addFunctionModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Добавить функцию</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addFunctionForm">
+                        <div class="mb-3">
+                            <label for="functionName" class="form-label">Название функции</label>
+                            <input type="text" class="form-control" id="functionName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="functionDescription" class="form-label">Описание</label>
+                            <textarea class="form-control" id="functionDescription" rows="3"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="parentFunction" class="form-label">Родительская функция</label>
+                            <select class="form-select" id="parentFunction">
+                                <option value="">Нет (корневая функция)</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="addFunction()">Добавить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для редактирования функции -->
+    <div class="modal fade" id="editFunctionModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Редактировать функцию</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editFunctionForm">
+                        <div class="mb-3">
+                            <label for="editFunctionName" class="form-label">Название функции</label>
+                            <input type="text" class="form-control" id="editFunctionName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editFunctionDescription" class="form-label">Описание</label>
+                            <textarea class="form-control" id="editFunctionDescription" rows="3"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editFunctionStatus" class="form-label">Статус</label>
+                            <select class="form-select" id="editFunctionStatus">
+                                <option value="active">Активная</option>
+                                <option value="inactive">Неактивная</option>
+                                <option value="testing">Тестирование</option>
+                                <option value="completed">Завершена</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="saveEditFunction()">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addEndpointModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Добавить Endpoint</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addEndpointForm">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <label for="endpointUrl" class="form-label">URL</label>
+                                <input type="text" class="form-control" id="endpointUrl" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="endpointMethod" class="form-label">Метод</label>
+                                <select class="form-select" id="endpointMethod">
+                                    <option value="GET">GET</option>
+                                    <option value="POST">POST</option>
+                                    <option value="PUT">PUT</option>
+                                    <option value="DELETE">DELETE</option>
+                                    <option value="PATCH">PATCH</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3 mt-3">
+                            <label for="endpointParameters" class="form-label">Параметры</label>
+                            <textarea class="form-control" id="endpointParameters" rows="3" placeholder="JSON или описание параметров"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="endpointHeaders" class="form-label">Заголовки</label>
+                            <textarea class="form-control" id="endpointHeaders" rows="3" placeholder="JSON или описание заголовков"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="endpointResponse" class="form-label">Информация об ответе</label>
+                            <textarea class="form-control" id="endpointResponse" rows="3" placeholder="Описание ответа, коды состояния и т.д."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="endpointStatus" class="form-label">Статус</label>
+                            <select class="form-select" id="endpointStatus">
+                                <option value="Не начат">Не начат</option>
+                                <option value="В работе">В работе</option>
+                                <option value="Завершен">Завершен</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="addEndpoint()">Добавить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addNoteModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Добавить заметку</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addNoteForm">
+                        <div class="mb-3">
+                            <label for="noteTitle" class="form-label">Заголовок</label>
+                            <input type="text" class="form-control" id="noteTitle" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="noteContent" class="form-label">Содержание</label>
+                            <textarea class="form-control" id="noteContent" rows="8" required></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="addNote()">Добавить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для добавления raw запроса -->
+    <div class="modal fade" id="addRawRequestModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Добавить Raw Запрос</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addRawRequestForm">
+                        <div class="mb-3">
+                            <label for="rawRequest" class="form-label">Raw Запрос</label>
+                            <textarea class="form-control" id="rawRequest" rows="10" placeholder="Вставьте сырой HTTP запрос из Burp Suite..." required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="rawResponse" class="form-label">Raw Ответ</label>
+                            <textarea class="form-control" id="rawResponse" rows="10" placeholder="Вставьте сырой HTTP ответ из Burp Suite..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="rawEndpointStatus" class="form-label">Статус</label>
+                            <select class="form-select" id="rawEndpointStatus">
+                                <option value="Не начат">Не начат</option>
+                                <option value="В работе">В работе</option>
+                                <option value="Завершен">Завершен</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="addRawRequest()">Добавить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>if(!window.d3){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js';document.head.appendChild(s);}</script>
+    <script src="https://cdn.jsdelivr.net/npm/vis-network@10.0.1/standalone/umd/vis-network.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

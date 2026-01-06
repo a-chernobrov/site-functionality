@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}Проекты{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-folder-open text-primary"></i> Проекты</h1>
+                <div>
+                    <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#addProjectModal">
+                        <i class="fas fa-plus"></i> Добавить проект
+                    </button>
+                    <a href="/websites" class="btn btn-outline-secondary">
+                        <i class="fas fa-globe"></i> Все сайты
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="projectsContainer">
+        {% if projects %}
+        <div class="row">
+            {% for project in projects %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100 project-card" style="cursor: pointer;" onclick="window.location.href='/project/{{ project.id }}'">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-folder text-primary"></i> {{ project.name }}
+                        </h5>
+                        <span class="badge {% if project.status == 'Активный' %}bg-success{% elif project.status == 'В работе' %}bg-warning{% else %}bg-secondary{% endif %}">
+                            {{ project.status }}
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        {% if project.description %}
+                        <p class="card-text text-muted">{{ project.description }}</p>
+                        {% else %}
+                        <p class="card-text text-muted">Описание не указано</p>
+                        {% endif %}
+                        
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-globe"></i> Сайтов: 
+                                <span class="badge bg-primary">{{ project.websites_count or 0 }}</span>
+                            </small>
+                        </div>
+                        
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-calendar"></i> Создан: {{ project.created_at.strftime('%d.%m.%Y %H:%M') if project.created_at else 'Не указано' }}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="btn-group w-100" role="group">
+                            <a href="/project/{{ project.id }}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-eye"></i> Открыть
+                            </a>
+                            <button class="btn btn-outline-warning btn-sm" onclick="event.stopPropagation(); editProject({{ project.id }})">
+                                <i class="fas fa-edit"></i> Изменить
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" onclick="event.stopPropagation(); deleteProject({{ project.id }})">
+                                <i class="fas fa-trash"></i> Удалить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-folder fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">Нет созданных проектов</h4>
+            <p class="text-muted">Создайте первый проект для организации ваших сайтов</p>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addProjectModal">
+                <i class="fas fa-plus"></i> Создать первый проект
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Модальное окно для добавления/редактирования проекта -->
+<div class="modal fade" id="addProjectModal" tabindex="-1" aria-labelledby="addProjectModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addProjectModalLabel">Добавить новый проект</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addProjectForm">
+                    <div class="mb-3">
+                        <label for="projectName" class="form-label">Название проекта *</label>
+                        <input type="text" class="form-control" id="projectName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="projectDescription" class="form-label">Описание</label>
+                        <textarea class="form-control" id="projectDescription" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="projectStatus" class="form-label">Статус</label>
+                        <select class="form-select" id="projectStatus">
+                            <option value="Активный">Активный</option>
+                            <option value="В работе">В работе</option>
+                            <option value="Завершен">Завершен</option>
+                            <option value="Приостановлен">Приостановлен</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-success" onclick="saveProject()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.project-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.project-card {
+    transition: all 0.3s ease;
+}
+</style>
+
+<script>
+let editingProjectId = null;
+
+function saveProject() {
+    const name = document.getElementById('projectName').value;
+    const description = document.getElementById('projectDescription').value;
+    const status = document.getElementById('projectStatus').value;
+    
+    if (!name.trim()) {
+        alert('Название проекта обязательно для заполнения');
+        return;
+    }
+    
+    const projectData = {
+        name: name.trim(),
+        description: description.trim(),
+        status: status
+    };
+    
+    const url = editingProjectId ? `/api/projects/${editingProjectId}` : '/api/projects';
+    const method = editingProjectId ? 'PUT' : 'POST';
+    
+    fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(projectData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Ошибка: ' + data.error);
+        } else {
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Ошибка:', error);
+        alert('Произошла ошибка при сохранении проекта');
+    });
+}
+
+function editProject(projectId) {
+    editingProjectId = projectId;
+    
+    // Получаем данные проекта
+    fetch(`/api/projects/${projectId}`)
+    .then(response => response.json())
+    .then(project => {
+        document.getElementById('projectName').value = project.name;
+        document.getElementById('projectDescription').value = project.description || '';
+        document.getElementById('projectStatus').value = project.status;
+        
+        document.getElementById('addProjectModalLabel').textContent = 'Редактировать проект';
+        
+        const modal = new bootstrap.Modal(document.getElementById('addProjectModal'));
+        modal.show();
+    })
+    .catch(error => {
+        console.error('Ошибка:', error);
+        alert('Произошла ошибка при загрузке данных проекта');
+    });
+}
+
+function deleteProject(projectId) {
+    if (confirm('Вы уверены, что хотите удалить этот проект? ВНИМАНИЕ: Все связанные сайты и их данные (функции, эндпоинты, заметки) будут БЕЗВОЗВРАТНО удалены!')) {
+        fetch(`/api/projects/${projectId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert('Ошибка: ' + data.error);
+            } else {
+                alert(data.message || 'Проект удален успешно');
+                location.reload();
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка:', error);
+            alert('Произошла ошибка при удалении проекта');
+        });
+    }
+}
+
+// Сброс формы при закрытии модального окна
+document.getElementById('addProjectModal').addEventListener('hidden.bs.modal', function () {
+    editingProjectId = null;
+    document.getElementById('addProjectForm').reset();
+    document.getElementById('addProjectModalLabel').textContent = 'Добавить новый проект';
+});
+</script>
+{% endblock %}

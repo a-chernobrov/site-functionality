@@ -1,0 +1,2 @@
+FUZZ,url,redirectlocation,position,status_code,content_length,content_words,content_lines,content_type,duration,resultfile,Ffufhash
+tel,https://45.145.188.74,,89,200,1975,85,32,text/html; charset=UTF-8,92.432901ms,,0262f59

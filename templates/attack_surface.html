@@ -159,7 +159,7 @@
                             <i class="fas fa-plus"></i> Добавить домены
                         </button>
                         <button class="btn btn-warning btn-sm ms-2" onclick="showProjectNmapUploadModal()">
-                            <i class="fas fa-upload"></i> Загрузить порты для проекта (XML)
+                            <i class="fas fa-upload"></i> Загрузить порты для проекта (open-port.txt)
                         </button>
                         <button class="btn btn-warning btn-sm ms-2" onclick="showProjectUdpUploadModal()">
                             <i class="fas fa-upload"></i> UDP для проекта (udpx.txt)
@@ -538,8 +538,8 @@
                 <form id="addDomainsForm">
                     <div class="mb-3">
                         <label for="domainsFile" class="form-label">Загрузить файл с доменами и IP адресами</label>
-                        <input type="file" class="form-control" id="domainsFile" accept=".txt,.csv" required>
-                        <div class="form-text">Поддерживаются файлы .txt и .csv с доменами, IP адресами и CIDR блоками (каждый с новой строки)</div>
+                        <input type="file" class="form-control" id="domainsFile" accept=".txt,.csv,.json" required>
+                        <div class="form-text">Поддерживаются файлы .txt, .csv и .json. Для .json берется поле url</div>
                     </div>
                     <div class="mb-3">
                         <label for="domainsPreview" class="form-label">Предварительный просмотр</label>
@@ -743,15 +743,15 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Загрузить порты для проекта (Nmap XML)</h5>
+                <h5 class="modal-title">Загрузить порты для проекта (open-port.txt)</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="projectNmapUploadForm">
                     <div class="mb-3">
-                        <label for="projectXmlFile" class="form-label">Файл Nmap XML</label>
-                        <input type="file" class="form-control" id="projectXmlFile" accept=".xml" required>
-                        <div class="form-text">Пример: nmap-ip.xml. Порты будут распределены по всем IP из файла</div>
+                        <label for="projectXmlFile" class="form-label">Файл open-port.txt</label>
+                        <input type="file" class="form-control" id="projectXmlFile" accept=".txt" required>
+                        <div class="form-text">JSONL формат: одна запись на строку, например {"ip":"1.2.3.4","port":80,"protocol":"tcp"}</div>
                     </div>
                     <div class="mb-3" id="projectPortsPreview" style="display: none;">
                         <label class="form-label">Найденные порты</label>
@@ -1008,8 +1008,44 @@ document.getElementById('domainsFile').addEventListener('change', function(event
     if (file) {
         const reader = new FileReader();
         reader.onload = function(e) {
-            const content = e.target.result;
-            document.getElementById('domainsPreview').value = content;
+            const content = e.target.result || '';
+            const name = String(file.name || '').toLowerCase();
+            if (name.endsWith('.json')) {
+                try {
+                    const parsed = JSON.parse(content);
+                    const urls = [];
+                    const seen = new Set();
+                    const add = (u) => {
+                        const s = String(u || '').trim();
+                        if (!s) return;
+                        if (seen.has(s)) return;
+                        seen.add(s);
+                        urls.push(s);
+                    };
+                    const walk = (v) => {
+                        if (Array.isArray(v)) {
+                            v.forEach(walk);
+                            return;
+                        }
+                        if (v && typeof v === 'object') {
+                            try {
+                                for (const k of Object.keys(v)) {
+                                    if (String(k).toLowerCase() === 'url') add(v[k]);
+                                }
+                            } catch (e) {}
+                            try {
+                                for (const x of Object.values(v)) walk(x);
+                            } catch (e) {}
+                        }
+                    };
+                    walk(parsed);
+                    document.getElementById('domainsPreview').value = urls.length ? urls.join('\n') : content;
+                } catch (err) {
+                    document.getElementById('domainsPreview').value = content;
+                }
+            } else {
+                document.getElementById('domainsPreview').value = content;
+            }
         };
         reader.readAsText(file);
     }
@@ -3191,31 +3227,32 @@ function parseProjectNmapXml(file) {
     const reader = new FileReader();
     reader.onload = function(e) {
         try {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(e.target.result, 'text/xml');
-            const parseError = xmlDoc.querySelector('parsererror');
-            if (parseError) throw new Error('Ошибка парсинга XML файла');
             const entries = [];
-            const hosts = xmlDoc.querySelectorAll('host');
-            hosts.forEach(host => {
-                const addrEl = host.querySelector('address[addrtype="ipv4"]');
-                const address = addrEl ? addrEl.getAttribute('addr') : '';
-                const portEls = host.querySelectorAll('port');
-                portEls.forEach(portEl => {
-                    const portId = portEl.getAttribute('portid');
-                    const protocol = portEl.getAttribute('protocol') || 'tcp';
-                    const state = portEl.querySelector('state')?.getAttribute('state');
-                    const service = portEl.querySelector('service')?.getAttribute('name') || '';
-                    if (state === 'open' && portId && address) {
-                        entries.push({ address, port: parseInt(portId, 10), protocol, service });
-                    }
-                });
-            });
+            const lines = String(e.target.result || '').split(/\r?\n/).filter(l => l.trim().length > 0);
+            const seen = new Set();
+            let skippedLines = 0;
+            for (const line of lines) {
+                try {
+                    const obj = JSON.parse(line);
+                    const address = (obj.ip || obj.address || '').trim();
+                    const port = Number(obj.port || obj.number);
+                    const protocol = String(obj.protocol || 'tcp').toLowerCase().trim();
+                    const service = String(obj.service || '').trim();
+                    if (!address || !Number.isFinite(port) || port <= 0) continue;
+                    if (protocol !== 'tcp') continue;
+                    const key = `${address}|${port}|${protocol}`;
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    entries.push({ address, port: parseInt(String(port), 10), protocol, service });
+                } catch (err) {
+                    skippedLines += 1;
+                }
+            }
             window.projectParsedEntries = entries;
             const preview = document.getElementById('projectPortsPreviewContent');
             const previewWrap = document.getElementById('projectPortsPreview');
             if (!entries.length) {
-                preview.innerHTML = '<div class="text-muted">Порты не найдены</div>';
+                preview.innerHTML = '<div class="text-muted">TCP порты не найдены</div>';
             } else {
                 const byIp = {};
                 entries.forEach(e => { if (!byIp[e.address]) byIp[e.address] = []; byIp[e.address].push(e); });
@@ -3225,11 +3262,14 @@ function parseProjectNmapXml(file) {
                 });
                 preview.innerHTML = html;
             }
+            if (skippedLines > 0) {
+                preview.innerHTML += `<div class="text-muted mt-2">Пропущено строк: ${skippedLines}</div>`;
+            }
             previewWrap.style.display = 'block';
             document.getElementById('projectUploadPortsBtn').disabled = entries.length === 0;
         } catch (err) {
-            console.error('Ошибка парсинга XML:', err);
-            alert('Ошибка при чтении XML файла: ' + err.message);
+            console.error('Ошибка парсинга open-port.txt:', err);
+            alert('Ошибка при чтении open-port.txt: ' + err.message);
         }
     };
     reader.readAsText(file);
@@ -3242,7 +3282,7 @@ function uploadProjectPorts() {
     }
     const entries = window.projectParsedEntries || [];
     if (!entries.length) {
-        alert('Сначала выберите и обработайте XML файл');
+        alert('Сначала выберите и обработайте open-port.txt');
         return;
     }
     const byIp = {};
